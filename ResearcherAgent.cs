@@ -9,8 +9,11 @@ namespace BlogWriter;
 /// Performs research tasks with a <see cref="ChatClientAgent"/> and returns
 /// concise findings.
 ///
-/// The agent can call the configured Tavily tool during execution and summarize
-/// results for use in later drafting stages.
+/// The Tavily web-search tool now runs inside the Researcher Foundry Hosted
+/// Agent itself (see HostedAgents/Researcher), not in this process — the
+/// <paramref name="llm"/> passed in is a remote <c>IChatClient</c> talking to
+/// that hosted agent's <c>/responses</c> endpoint, so tool calls happen
+/// server-side and are already reflected in the returned text/usage.
 /// </summary>
 public class ResearcherAgent : IResearcherAgent
 {
@@ -28,7 +31,7 @@ public class ResearcherAgent : IResearcherAgent
     // Per-call output-token cap, applied on each RunAsync to bound cost.
     private readonly int? _maxOutputTokens;
 
-    public ResearcherAgent(IChatClient llm, ChatOptions chatOptions, AIFunction tavilyTool, ILogger<ResearcherAgent> logger)
+    public ResearcherAgent(IChatClient llm, ChatOptions chatOptions, ILogger<ResearcherAgent> logger)
     {
         _logger = logger;
         _maxOutputTokens = chatOptions.MaxOutputTokens;
@@ -45,29 +48,13 @@ public class ResearcherAgent : IResearcherAgent
                 // Preserve the original sampling/cost settings.
                 Temperature = chatOptions.Temperature,
                 MaxOutputTokens = chatOptions.MaxOutputTokens,
-                // Attaching the tool lets the model call it autonomously.
-                Tools = [tavilyTool],
             },
         })
         .AsBuilder()
-        // Function-invocation middleware: fires around every tool call the agent
-        // makes. We log each time the model invokes the Tavily search tool.
-        .Use(async (agent, context, next, cancellationToken) =>
-        {
-            if (context.Function.Name == tavilyTool.Name)
-            {
-                _logger.LogInformation(
-                    "Researcher invoking Tavily tool '{Tool}' with arguments {Arguments}",
-                    context.Function.Name,
-                    context.Arguments);
-            }
-
-            return await next(context, cancellationToken);
-        })
         .UseOpenTelemetry(sourceName: "BlogWriter.Agents")
         .Build();
 
-        _logger.LogInformation("ResearcherAgent initialized with Tavily tool: {ToolName}", tavilyTool.Name);
+        _logger.LogInformation("ResearcherAgent initialized (Tavily tool runs inside the hosted Researcher agent).");
     }
 
     /// <summary>Execute research by letting the agent search and summarise.</summary>
