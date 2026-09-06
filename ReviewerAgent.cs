@@ -14,7 +14,7 @@ namespace BlogWriter;
 /// </summary>
 public class ReviewerAgent : IReviewerAgent
 {
-    private readonly ChatClientAgent _agent;
+    private readonly AIAgent _agent;
 
     // Emits a span per review. Activated by the ActivityListener registered in
     // Program.cs (or an OpenTelemetry TracerProvider).
@@ -22,9 +22,13 @@ public class ReviewerAgent : IReviewerAgent
 
     private readonly ILogger<ReviewerAgent> _logger;
 
+    // Per-call output-token cap, applied on each RunAsync to bound cost.
+    private readonly int? _maxOutputTokens;
+
     public ReviewerAgent(IChatClient llm, ChatOptions chatOptions, ILogger<ReviewerAgent> logger)
     {
         _logger = logger;
+        _maxOutputTokens = chatOptions.MaxOutputTokens;
 
         _agent = new ChatClientAgent(llm, new ChatClientAgentOptions
         {
@@ -35,26 +39,25 @@ public class ReviewerAgent : IReviewerAgent
                 Temperature = chatOptions.Temperature,
                 MaxOutputTokens = chatOptions.MaxOutputTokens,
             },
-        });
+        })
+        .AsBuilder()
+        .UseOpenTelemetry(sourceName: "BlogWriter.Agents")
+        .Build();
         _logger.LogInformation("ReviewerAgent initialized.");
     }
 
-    public async Task<string> InvokeAsync(ResearchState state)
+    public async Task<string> InvokeAsync(ResearchState state, CancellationToken cancellationToken = default)
     {
         using Activity? activity = s_activitySource.StartActivity("Reviewer.Invoke");
         activity?.SetTag("blog.revision", state.RevisionNumber);
 
         string draft = state.Draft;
-        int revisionNum = state.RevisionNumber;
-
-        if (revisionNum >= ResearchState.MaxRevisions)
-        {
-            return "Uh oh - Maximum revisions reached.";
-        }
 
         // Per-turn input only — the evaluation criteria are on the agent.
         string message = $"""
             Main Task: {state.MainTask}
+
+            Target Word Count: {state.MinWords} to {state.MaxWords} words
 
             Draft to Review:
             {draft}
@@ -62,9 +65,14 @@ public class ReviewerAgent : IReviewerAgent
 
         try
         {
-            AgentResponse response = await _agent.RunAsync(message);
+            // Cap per-call output tokens so a single turn can't blow the cost budget.
+            ChatClientAgentRunOptions runOptions = new(new ChatOptions
+            {
+                MaxOutputTokens = _maxOutputTokens,
+            });
+            AgentResponse response = await _agent.RunAsync(message, options: runOptions, cancellationToken: cancellationToken);
             string content = response.Text;
-            return !string.IsNullOrEmpty(content) ? content : "APPROVED";
+            return !string.IsNullOrEmpty(content) ? content : ManageError("No review content returned from the agent.");
         }
         catch (TokenCapExceededException)
         {
@@ -73,34 +81,45 @@ public class ReviewerAgent : IReviewerAgent
         }
         catch (Exception e)
         {
-            // Do NOT approve on failure — that would ship an unreviewed draft.
-            // Returning feedback (not "APPROVED") routes back to the author for
-            // another attempt; the revision cap still guarantees termination.
-            Console.WriteLine($"Review error: {e.Message}");
-            return "Review could not be completed due to a transient error. Please revise and resubmit the draft.";
+            return ManageError(e.Message, e);
         }
     }
 
-    /// <summary>Node that reviews the draft.</summary>
-    public async Task<ResearchState> ReviewerNodeAsync(ResearchState state)
+    private string ManageError(string reason, Exception? exception = null)
     {
-        Console.WriteLine("\n>>REVIEWER");
+        // Do NOT approve on failure — that would ship an unreviewed draft.
+        // Returning feedback (not "APPROVED") routes back to the author for
+        // another attempt; the revision cap still guarantees termination.
+        if (exception is not null)
+        {
+            _logger.LogError(exception, "Review failed: {Reason}", reason);
+        }
+        else
+        {
+            _logger.LogWarning("Review could not be completed: {Reason}", reason);
+        }
 
-        string review = await InvokeAsync(state);
+        return "Review could not be completed due to a transient error. Please revise and resubmit the draft.";
+    }
+
+    /// <summary>Node that reviews the draft.</summary>
+    public async Task<ResearchState> ReviewerNodeAsync(ResearchState state, CancellationToken cancellationToken = default)
+    {
+        string review = await InvokeAsync(state, cancellationToken);
         string preview = review.Length > 100 ? review[..100] : review;
-        Console.WriteLine($"Review: {preview}...");
+        _logger.LogInformation("Review: {Preview}...", preview);
 
-        bool isApproved = review.ToUpperInvariant().Contains("APPROVED");
+        bool isApproved = ResearchState.IsApproved(review);
 
         if (isApproved)
         {
-            Console.WriteLine("\u2713 Draft APPROVED");
-            state.ReviewNotes = "APPROVED";
+            _logger.LogInformation("Draft APPROVED");
+            state.ReviewNotes = ResearchState.ApprovedMarker;
             state.NextStep = "END";
         }
         else
         {
-            Console.WriteLine("\u2717 Revisions needed");
+            _logger.LogInformation("Revisions needed");
             state.ReviewNotes = review;
             state.NextStep = "author";
         }

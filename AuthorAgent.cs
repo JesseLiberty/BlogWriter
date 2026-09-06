@@ -13,7 +13,7 @@ namespace BlogWriter;
 /// </summary>
 public class AuthorAgent : IAuthorAgent
 {
-    private readonly ChatClientAgent _agent;
+    private readonly AIAgent _agent;
 
     // Emits a span per draft creation/revision. Activated by the ActivityListener
     // registered in Program.cs (or an OpenTelemetry TracerProvider).
@@ -21,9 +21,13 @@ public class AuthorAgent : IAuthorAgent
 
     private readonly ILogger<AuthorAgent> _logger;
 
+    // Per-call output-token cap, applied on each RunAsync to bound cost.
+    private readonly int? _maxOutputTokens;
+
     public AuthorAgent(IChatClient llm, ChatOptions chatOptions, ILogger<AuthorAgent> logger)
     {
         _logger = logger;
+        _maxOutputTokens = chatOptions.MaxOutputTokens;
 
         _agent = new ChatClientAgent(llm, new ChatClientAgentOptions
         {
@@ -34,11 +38,14 @@ public class AuthorAgent : IAuthorAgent
                 Temperature = chatOptions.Temperature,
                 MaxOutputTokens = chatOptions.MaxOutputTokens,
             },
-        });
+        })
+        .AsBuilder()
+        .UseOpenTelemetry(sourceName: "BlogWriter.Agents")
+        .Build();
         _logger.LogInformation("AuthorAgent initialized.");
     }
 
-    public async Task<string> InvokeAsync(ResearchState state)
+    public async Task<string?> InvokeAsync(ResearchState state, CancellationToken cancellationToken = default)
     {
         using Activity? activity = s_activitySource.StartActivity("Author.Invoke");
         activity?.SetTag("blog.revision", state.RevisionNumber);
@@ -56,13 +63,26 @@ public class AuthorAgent : IAuthorAgent
             Current Draft: {(string.IsNullOrEmpty(state.Draft) ? "(none — write the first draft)" : state.Draft)}
 
             Review Notes: {(string.IsNullOrEmpty(state.ReviewNotes) ? "(none)" : state.ReviewNotes)}
+
+            Target Word Count: {state.MinWords} to {state.MaxWords} words
             """;
 
         try
         {
-            AgentResponse response = await _agent.RunAsync(message);
+            // Cap per-call output tokens so a single turn can't blow the cost budget.
+            ChatClientAgentRunOptions runOptions = new(new ChatOptions
+            {
+                MaxOutputTokens = _maxOutputTokens,
+            });
+            AgentResponse response = await _agent.RunAsync(message, options: runOptions, cancellationToken: cancellationToken);
             string content = response.Text;
-            return !string.IsNullOrEmpty(content) ? content : "Draft in progress...";
+            if (!string.IsNullOrEmpty(content))
+            {
+                return content;
+            }
+
+            _logger.LogWarning("Author agent returned no content for revision {Revision}.", state.RevisionNumber);
+            return null;
         }
         catch (TokenCapExceededException)
         {
@@ -71,21 +91,59 @@ public class AuthorAgent : IAuthorAgent
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Author error: {e.Message}");
-            return "Error generating draft. Please try again.";
+            _logger.LogError(e, "Author agent failed to generate content.");
+            return null;
         }
     }
 
     /// <summary>Author node that creates or revises draft.</summary>
-    public async Task<ResearchState> AuthorNodeAsync(ResearchState state)
+    public async Task<ResearchState> AuthorNodeAsync(ResearchState state, CancellationToken cancellationToken = default)
     {
-        Console.WriteLine("\n>>>Author");
+        _logger.LogInformation("Author stage started.");
 
-        string draft = await InvokeAsync(state);
-        Console.WriteLine($"Draft created: {draft.Length} characters");
+        string? draft = await InvokeAsync(state, cancellationToken);
 
-        state.Draft = draft;
+        if (string.IsNullOrEmpty(draft))
+        {
+            if (string.IsNullOrEmpty(state.Draft))
+            {
+                // No prior draft to keep either — the workflow must always end with
+                // some draft, so assemble one from the research findings rather than
+                // sending the reviewer (and ultimately the user) an empty draft.
+                _logger.LogWarning("Author agent produced no draft and none exists yet; using a fallback draft built from research findings.");
+                state.Draft = BuildFallbackDraft(state);
+            }
+            else
+            {
+                // Keep whatever draft already exists rather than clobbering it with a
+                // placeholder — an empty/failed generation shouldn't erase real content.
+                _logger.LogWarning("Author agent produced no draft; keeping the previous draft.");
+            }
+        }
+        else
+        {
+            state.Draft = draft;
+            _logger.LogInformation("Draft created: {Length} characters", draft.Length);
+        }
+
         state.RevisionNumber += 1;
         return state;
+    }
+
+    // Last-resort content used only when the model never manages to produce a
+    // draft at all, so the workflow still always yields something reviewable.
+    private static string BuildFallbackDraft(ResearchState state)
+    {
+        string researchText = state.ResearchFindings.Count > 0
+            ? string.Join("\n\n", state.ResearchFindings)
+            : "No research findings were available.";
+
+        return $"""
+            # {state.MainTask}
+
+            _The author agent could not generate content for this topic; this fallback draft was assembled automatically from the raw research findings._
+
+            {researchText}
+            """;
     }
 }
