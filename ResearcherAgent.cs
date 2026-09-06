@@ -58,9 +58,8 @@ public class ResearcherAgent : IResearcherAgent
         .Use(async (agent, context, next, cancellationToken) =>
         {
             _logger.LogInformation(
-                "Researcher invoking tool '{Tool}' with arguments {Arguments}",
-                context.Function.Name,
-                context.Arguments);
+                "Researcher invoking tool '{Tool}'...",
+                context.Function.Name);
 
             return await next(context, cancellationToken);
         })
