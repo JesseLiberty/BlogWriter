@@ -50,4 +50,18 @@ public class ResearchStateTests
         Assert.True(belowCap.NeedsRevision);
         Assert.False(atCap.NeedsRevision);
     }
+
+    [Theory]
+    [InlineData("APPROVED", ResearchState.MaxRevisions, false)]
+    [InlineData("Still needs work.", ResearchState.MaxRevisions, true)]
+    [InlineData("Still needs work.", ResearchState.MaxRevisions - 1, false)]
+    public void RevisionLimitReached_RequiresUnapprovedReviewAtCap(
+        string reviewNotes,
+        int revisionNumber,
+        bool expected)
+    {
+        var state = new ResearchState { ReviewNotes = reviewNotes, RevisionNumber = revisionNumber };
+
+        Assert.Equal(expected, state.RevisionLimitReached);
+    }
 }
