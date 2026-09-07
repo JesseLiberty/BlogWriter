@@ -16,25 +16,28 @@ public sealed class TokenCapChatClient : DelegatingChatClient
     // UsageDetails.AdditionalCounts (there is no dedicated top-level property).
     private const string ReasoningTokenCountKey = "OutputTokenDetails.ReasoningTokenCount";
 
-    private readonly long _maxTotalTokens;
-    private long _totalTokens;
-    private long _inputTokens;
-    private long _outputTokens;
-    private long _reasoningTokens;
+    private readonly TokenBudget _budget;
 
-    public TokenCapChatClient(IChatClient innerClient, long maxTotalTokens) : base(innerClient)
+    public TokenCapChatClient(IChatClient innerClient, long maxTotalTokens)
+        : this(innerClient, new TokenBudget(maxTotalTokens))
     {
-        _maxTotalTokens = maxTotalTokens > 0
-            ? maxTotalTokens
-            : throw new ArgumentOutOfRangeException(nameof(maxTotalTokens), maxTotalTokens, "Token cap must be a positive number.");
+    }
+
+    private TokenCapChatClient(IChatClient innerClient, TokenBudget budget) : base(innerClient) =>
+        _budget = budget;
+
+    /// <summary>
+    /// Creates a MAF chat-client middleware factory whose clients share one
+    /// cumulative process-wide token budget.
+    /// </summary>
+    public static Func<IChatClient, IChatClient> CreateSharedFactory(long maxTotalTokens)
+    {
+        var budget = new TokenBudget(maxTotalTokens);
+        return innerClient => new TokenCapChatClient(innerClient, budget);
     }
 
     /// <summary>Cumulative token usage observed across every model round-trip so far.</summary>
-    public TokenUsageSnapshot UsageSnapshot => new(
-        Interlocked.Read(ref _inputTokens),
-        Interlocked.Read(ref _outputTokens),
-        Interlocked.Read(ref _reasoningTokens),
-        Interlocked.Read(ref _totalTokens));
+    public TokenUsageSnapshot UsageSnapshot => _budget.UsageSnapshot;
 
     public override async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
@@ -68,29 +71,56 @@ public sealed class TokenCapChatClient : DelegatingChatClient
 
     private void Track(UsageDetails? usage)
     {
-        if (usage is null)
+        _budget.Track(usage);
+    }
+
+    private sealed class TokenBudget
+    {
+        private readonly long _maxTotalTokens;
+        private long _totalTokens;
+        private long _inputTokens;
+        private long _outputTokens;
+        private long _reasoningTokens;
+
+        public TokenBudget(long maxTotalTokens)
         {
-            return;
+            _maxTotalTokens = maxTotalTokens > 0
+                ? maxTotalTokens
+                : throw new ArgumentOutOfRangeException(nameof(maxTotalTokens), maxTotalTokens, "Token cap must be a positive number.");
         }
 
-        Interlocked.Add(ref _inputTokens, usage.InputTokenCount ?? 0);
-        Interlocked.Add(ref _outputTokens, usage.OutputTokenCount ?? 0);
-        if (usage.AdditionalCounts is { } additionalCounts &&
-            additionalCounts.TryGetValue(ReasoningTokenCountKey, out long reasoningTokens))
-        {
-            Interlocked.Add(ref _reasoningTokens, reasoningTokens);
-        }
+        public TokenUsageSnapshot UsageSnapshot => new(
+            Interlocked.Read(ref _inputTokens),
+            Interlocked.Read(ref _outputTokens),
+            Interlocked.Read(ref _reasoningTokens),
+            Interlocked.Read(ref _totalTokens));
 
-        long used = usage.TotalTokenCount ?? 0;
-        if (used == 0)
+        public void Track(UsageDetails? usage)
         {
-            return;
-        }
+            if (usage is null)
+            {
+                return;
+            }
 
-        long total = Interlocked.Add(ref _totalTokens, used);
-        if (total > _maxTotalTokens)
-        {
-            throw new TokenCapExceededException(total, _maxTotalTokens);
+            Interlocked.Add(ref _inputTokens, usage.InputTokenCount ?? 0);
+            Interlocked.Add(ref _outputTokens, usage.OutputTokenCount ?? 0);
+            if (usage.AdditionalCounts is { } additionalCounts &&
+                additionalCounts.TryGetValue(ReasoningTokenCountKey, out long reasoningTokens))
+            {
+                Interlocked.Add(ref _reasoningTokens, reasoningTokens);
+            }
+
+            long used = usage.TotalTokenCount ?? 0;
+            if (used == 0)
+            {
+                return;
+            }
+
+            long total = Interlocked.Add(ref _totalTokens, used);
+            if (total > _maxTotalTokens)
+            {
+                throw new TokenCapExceededException(total, _maxTotalTokens);
+            }
         }
     }
 }

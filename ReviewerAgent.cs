@@ -22,13 +22,9 @@ public class ReviewerAgent : IReviewerAgent
 
     private readonly ILogger<ReviewerAgent> _logger;
 
-    // Per-call output-token cap, applied on each RunAsync to bound cost.
-    private readonly int? _maxOutputTokens;
-
-    public ReviewerAgent(AIAgent agent, ChatOptions chatOptions, ILogger<ReviewerAgent> logger)
+    public ReviewerAgent(AIAgent agent, ILogger<ReviewerAgent> logger)
     {
         _logger = logger;
-        _maxOutputTokens = chatOptions.MaxOutputTokens;
 
         _agent = agent;
         _logger.LogInformation("ReviewerAgent initialized.");
@@ -53,12 +49,7 @@ public class ReviewerAgent : IReviewerAgent
 
         try
         {
-            // Cap per-call output tokens so a single turn can't blow the cost budget.
-            ChatClientAgentRunOptions runOptions = new(new ChatOptions
-            {
-                MaxOutputTokens = _maxOutputTokens,
-            });
-            AgentResponse response = await _agent.RunAsync(message, options: runOptions, cancellationToken: cancellationToken);
+            AgentResponse response = await _agent.RunAsync(message, cancellationToken: cancellationToken);
             string content = response.Text;
             return !string.IsNullOrEmpty(content) ? content : ManageError("No review content returned from the agent.");
         }

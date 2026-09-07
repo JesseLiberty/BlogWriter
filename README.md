@@ -44,7 +44,6 @@ auth, no API keys:
 | `RESEARCHER_AGENT_NAME` | no | `Researcher` | |
 | `AUTHOR_AGENT_NAME` | no | `Author` | |
 | `REVIEWER_AGENT_NAME` | no | `Reviewer` | |
-| `MAX_OUTPUT_TOKENS` | no | `4096` | Per-call cap |
 | `MAX_TOTAL_TOKENS` | no | `40000` | Cumulative process-wide cap (`TokenCapChatClient`) |
 
 `TAVILY_API_KEY` is no longer configured here — it now lives in the

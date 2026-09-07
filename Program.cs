@@ -6,11 +6,6 @@ using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-<<<<<<< HEAD
-using ModelContextProtocol.Client;
-using OpenAI;
-=======
->>>>>>> c05a6c3 (Add hosted agent implementations)
 
 // Secrets come from the .NET user-secrets store and from
 // environment variables (secrets win on key collisions).
@@ -33,8 +28,7 @@ string researcherAgentName = config["RESEARCHER_AGENT_NAME"] ?? "Researcher";
 string authorAgentName = config["AUTHOR_AGENT_NAME"] ?? "Author";
 string reviewerAgentName = config["REVIEWER_AGENT_NAME"] ?? "Reviewer";
 
-// Overridable via user-secrets/env vars; these defaults match the original behaviour.
-int maxOutputTokens = int.TryParse(config["MAX_OUTPUT_TOKENS"], out int configuredMaxOutputTokens) ? configuredMaxOutputTokens : 4096;
+// Cumulative process-wide budget shared by all four MAF-hosted agent clients.
 long maxTotalTokens = long.TryParse(config["MAX_TOTAL_TOKENS"], out long configuredMaxTotalTokens) ? configuredMaxTotalTokens : 40000;
 
 // Entra ID only — no API keys, per repository constraint. Agent Framework owns
@@ -44,10 +38,15 @@ var azureCredential = new AzureCliCredential(new AzureCliCredentialOptions
     TenantId = tenantId,
 });
 AIProjectClient projectClient = new(foundryProjectEndpoint, azureCredential);
+Func<IChatClient, IChatClient> tokenCapFactory = TokenCapChatClient.CreateSharedFactory(maxTotalTokens);
 AIAgent BuildFoundryAgent(string hostedAgentName)
 {
     Uri agentEndpoint = new($"{foundryProjectEndpoint.AbsoluteUri.TrimEnd('/')}/agents/{hostedAgentName}/endpoint/protocols/openai");
-    return projectClient.AsAIAgent(agentEndpoint);
+    return projectClient.AsAIAgent(
+        agentEndpoint,
+        tools: null,
+        clientFactory: tokenCapFactory,
+        services: null);
 }
 
 AIAgent bloggerLlm = BuildFoundryAgent(bloggerAgentName);
@@ -55,48 +54,13 @@ AIAgent researcherLlm = BuildFoundryAgent(researcherAgentName);
 AIAgent authorLlm = BuildFoundryAgent(authorAgentName);
 AIAgent reviewerLlm = BuildFoundryAgent(reviewerAgentName);
 
-var chatOptions = new ChatOptions
-{
-    Temperature = 1,
-    MaxOutputTokens = maxOutputTokens
-};
-
 // Creating a callable object
 using ILoggerFactory loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
-ILogger startupLogger = loggerFactory.CreateLogger("BlogWriter.Startup");
 
-// Microsoft Learn's remote MCP server exposes docs search/fetch tools the
-// Researcher can call alongside Tavily for authoritative Microsoft/Azure content.
-// If the remote endpoint is unreachable/slow/erroring at startup, don't let it
-// take down the whole app — fall back to Tavily-only tools.
-List<AIFunction> researcherTools = [tavilyTool];
-try
-{
-    McpClient microsoftLearnMcp = await McpClient.CreateAsync(
-        new HttpClientTransport(new HttpClientTransportOptions
-        {
-            Endpoint = new Uri("https://learn.microsoft.com/api/mcp"),
-            Name = "microsoft-learn",
-        }));
-    IList<McpClientTool> microsoftLearnTools = await microsoftLearnMcp.ListToolsAsync();
-    researcherTools.AddRange(microsoftLearnTools);
-}
-catch (Exception ex)
-{
-    startupLogger.LogWarning(ex, "Microsoft Learn MCP server unavailable; continuing with Tavily-only research tools.");
-}
-
-<<<<<<< HEAD
-var bloggerAgent = new BloggerAgent(llm, chatOptions, loggerFactory.CreateLogger<BloggerAgent>());
-var researcherAgent = new ResearcherAgent(llm, chatOptions, researcherTools, loggerFactory.CreateLogger<ResearcherAgent>());
-var authorAgent = new AuthorAgent(llm, chatOptions, loggerFactory.CreateLogger<AuthorAgent>());
-var reviewerAgent = new ReviewerAgent(llm, chatOptions, loggerFactory.CreateLogger<ReviewerAgent>());
-=======
-var bloggerAgent = new BloggerAgent(bloggerLlm, chatOptions, loggerFactory.CreateLogger<BloggerAgent>());
-var researcherAgent = new ResearcherAgent(researcherLlm, chatOptions, loggerFactory.CreateLogger<ResearcherAgent>());
-var authorAgent = new AuthorAgent(authorLlm, chatOptions, loggerFactory.CreateLogger<AuthorAgent>());
-var reviewerAgent = new ReviewerAgent(reviewerLlm, chatOptions, loggerFactory.CreateLogger<ReviewerAgent>());
->>>>>>> c05a6c3 (Add hosted agent implementations)
+var bloggerAgent = new BloggerAgent(bloggerLlm, loggerFactory.CreateLogger<BloggerAgent>());
+var researcherAgent = new ResearcherAgent(researcherLlm, loggerFactory.CreateLogger<ResearcherAgent>());
+var authorAgent = new AuthorAgent(authorLlm, loggerFactory.CreateLogger<AuthorAgent>());
+var reviewerAgent = new ReviewerAgent(reviewerLlm, loggerFactory.CreateLogger<ReviewerAgent>());
 var app = new BlogWorkflow(bloggerAgent, researcherAgent, authorAgent, reviewerAgent, loggerFactory.CreateLogger<BlogWorkflow>());
 
 // Distributed tracing: an ActivityListener activates every "BlogWriter.*"
@@ -198,15 +162,15 @@ foreach (string finding in result.ResearchFindings)
     Console.WriteLine($"- {finding}");
 }
 
-Console.WriteLine($"\n\n========== Draft ==========\n\n{result.Draft}");
-Console.WriteLine($"\n========== Review Notes ==========\n{result.ReviewNotes}");
-Console.WriteLine($"\n========== Revision Notes ==========\n{result.RevisionNumber}");
+Console.WriteLine($"\nDraft:\n{result.Draft}");
+Console.WriteLine($"\nReview Notes: {result.ReviewNotes}");
+Console.WriteLine($"Revision Number: {result.RevisionNumber}");
 if (result.RevisionNumber >= ResearchState.MaxRevisions)
 {
     // The revision cap terminates the loop even if the reviewer never approved —
     // call that out so the draft above isn't mistaken for a reviewer-approved one.
     Console.WriteLine("Note: Maximum revision limit reached; draft above printed as-is.");
 }
-Console.WriteLine("\n=============================\n");
+Console.WriteLine("=============================");
 
 

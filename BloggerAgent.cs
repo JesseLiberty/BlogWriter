@@ -30,13 +30,9 @@ public class BloggerAgent : IBloggerAgent
 
     private readonly ILogger<BloggerAgent> _logger;
 
-    // Per-call output-token cap, applied on each RunAsync to bound cost.
-    private readonly int? _maxOutputTokens;
-
-    public BloggerAgent(AIAgent agent, ChatOptions chatOptions, ILogger<BloggerAgent> logger)
+    public BloggerAgent(AIAgent agent, ILogger<BloggerAgent> logger)
     {
         _logger = logger;
-        _maxOutputTokens = chatOptions.MaxOutputTokens;
 
         _agent = agent;
         _logger.LogInformation("BloggerAgent initialized.");
@@ -48,7 +44,7 @@ public class BloggerAgent : IBloggerAgent
         {
             Name = "Blogger",
             ChatOptions = chatOptions,
-        }), chatOptions, logger)
+        }), logger)
     {
     }
 
@@ -115,13 +111,8 @@ public class BloggerAgent : IBloggerAgent
 
         try
         {
-            // Cap per-call output tokens so a single turn can't blow the cost budget.
-            ChatClientAgentRunOptions runOptions = new(new ChatOptions
-            {
-                MaxOutputTokens = _maxOutputTokens,
-            });
             AgentResponse<BloggerDecision> response =
-                await _agent.RunAsync<BloggerDecision>(stateSummary, options: runOptions, serializerOptions: _jsonOptions, cancellationToken: cancellationToken);
+                await _agent.RunAsync<BloggerDecision>(stateSummary, serializerOptions: _jsonOptions, cancellationToken: cancellationToken);
 
             BloggerDecision decision = response.Result;
             if (decision is not null && !string.IsNullOrEmpty(decision.NextStep))
