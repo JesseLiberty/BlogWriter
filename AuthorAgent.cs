@@ -24,24 +24,12 @@ public class AuthorAgent : IAuthorAgent
     // Per-call output-token cap, applied on each RunAsync to bound cost.
     private readonly int? _maxOutputTokens;
 
-    public AuthorAgent(IChatClient llm, ChatOptions chatOptions, ILogger<AuthorAgent> logger)
+    public AuthorAgent(AIAgent agent, ChatOptions chatOptions, ILogger<AuthorAgent> logger)
     {
         _logger = logger;
         _maxOutputTokens = chatOptions.MaxOutputTokens;
 
-        _agent = new ChatClientAgent(llm, new ChatClientAgentOptions
-        {
-            Name = "Author",
-            ChatOptions = new ChatOptions
-            {
-                Instructions = Prompts.AuthorInstructions,
-                Temperature = chatOptions.Temperature,
-                MaxOutputTokens = chatOptions.MaxOutputTokens,
-            },
-        })
-        .AsBuilder()
-        .UseOpenTelemetry(sourceName: "BlogWriter.Agents")
-        .Build();
+        _agent = agent;
         _logger.LogInformation("AuthorAgent initialized.");
     }
 

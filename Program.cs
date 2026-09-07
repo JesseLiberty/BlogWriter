@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
+using Azure.AI.Projects;
 using Azure.Identity;
 using BlogWriter;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -20,6 +22,7 @@ string GetRequired(string key) =>
 // deployed independently (see HostedAgents/*/README and azd scaffolding);
 // this app only references them by name, it never creates/updates them.
 var foundryProjectEndpoint = new Uri(GetRequired("FOUNDRY_PROJECT_ENDPOINT"));
+string tenantId = GetRequired("AZURE_TENANT_ID");
 string bloggerAgentName = config["BLOGGER_AGENT_NAME"] ?? "Blogger";
 string researcherAgentName = config["RESEARCHER_AGENT_NAME"] ?? "Researcher";
 string authorAgentName = config["AUTHOR_AGENT_NAME"] ?? "Author";
@@ -29,33 +32,23 @@ string reviewerAgentName = config["REVIEWER_AGENT_NAME"] ?? "Reviewer";
 int maxOutputTokens = int.TryParse(config["MAX_OUTPUT_TOKENS"], out int configuredMaxOutputTokens) ? configuredMaxOutputTokens : 4096;
 long maxTotalTokens = long.TryParse(config["MAX_TOTAL_TOKENS"], out long configuredMaxTotalTokens) ? configuredMaxTotalTokens : 40000;
 
-// Entra ID only — no API keys, per repository constraint. One credential and
-// HttpClient are shared across all 4 remote hosted-agent chat clients.
-var azureCredential = new DefaultAzureCredential();
-using var hostedAgentHttpClient = new HttpClient();
-
-// Builds one IChatClient per hosted agent, each still wrapped with function
-// invocation, OpenTelemetry, and a shared TokenCapChatClient — identical
-// middleware pipeline to the pre-migration single shared client, just fanned
-// out to 4 remote transports instead of 1.
-List<TokenCapChatClient> tokenCapChatClients = [];
-IChatClient BuildAgentChatClient(string hostedAgentName)
+// Entra ID only — no API keys, per repository constraint. Agent Framework owns
+// the Foundry transport and Responses protocol details.
+var azureCredential = new AzureCliCredential(new AzureCliCredentialOptions
 {
-    TokenCapChatClient? tokenCap = null;
-    IChatClient client = new RemoteHostedAgentChatClient(hostedAgentHttpClient, azureCredential, foundryProjectEndpoint, hostedAgentName)
-        .AsBuilder()
-        .UseFunctionInvocation()
-        .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
-        .Use(inner => tokenCap = new TokenCapChatClient(inner, maxTotalTokens))
-        .Build();
-    tokenCapChatClients.Add(tokenCap!);
-    return client;
+    TenantId = tenantId,
+});
+AIProjectClient projectClient = new(foundryProjectEndpoint, azureCredential);
+AIAgent BuildFoundryAgent(string hostedAgentName)
+{
+    Uri agentEndpoint = new($"{foundryProjectEndpoint.AbsoluteUri.TrimEnd('/')}/agents/{hostedAgentName}/endpoint/protocols/openai");
+    return projectClient.AsAIAgent(agentEndpoint);
 }
 
-IChatClient bloggerLlm = BuildAgentChatClient(bloggerAgentName);
-IChatClient researcherLlm = BuildAgentChatClient(researcherAgentName);
-IChatClient authorLlm = BuildAgentChatClient(authorAgentName);
-IChatClient reviewerLlm = BuildAgentChatClient(reviewerAgentName);
+AIAgent bloggerLlm = BuildFoundryAgent(bloggerAgentName);
+AIAgent researcherLlm = BuildFoundryAgent(researcherAgentName);
+AIAgent authorLlm = BuildFoundryAgent(authorAgentName);
+AIAgent reviewerLlm = BuildFoundryAgent(reviewerAgentName);
 
 var chatOptions = new ChatOptions
 {
@@ -182,23 +175,4 @@ if (result.RevisionNumber >= ResearchState.MaxRevisions)
 }
 Console.WriteLine("=============================");
 
-// Aggregate usage across all 4 remote hosted-agent chat clients (one
-// TokenCapChatClient per agent, replacing the single shared instance from
-// before the migration).
-long totalInput = 0, totalOutput = 0, totalReasoning = 0, totalTokens = 0;
-foreach (TokenCapChatClient tokenCap in tokenCapChatClients)
-{
-    TokenUsageSnapshot usage = tokenCap.UsageSnapshot;
-    totalInput += usage.InputTokens;
-    totalOutput += usage.OutputTokens;
-    totalReasoning += usage.ReasoningTokens;
-    totalTokens += usage.TotalTokens;
-}
-
-Console.WriteLine("\n========== TOKEN USAGE ==========");
-Console.WriteLine($"Input tokens:     {totalInput}");
-Console.WriteLine($"Output tokens:    {totalOutput}");
-Console.WriteLine($"Reasoning tokens: {totalReasoning}");
-Console.WriteLine($"Total tokens:     {totalTokens}");
-Console.WriteLine("==================================");
 

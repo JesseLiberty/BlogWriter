@@ -14,7 +14,7 @@ Microsoft Entra ID identity, and OpenAI-compatible `/responses` endpoint. The
 console app (this project) no longer builds the agents in-process — it only
 **orchestrates** them locally via the MAF Workflow in `BlogWorkflow.cs`,
 calling each hosted agent as a remote `IChatClient`
-(`RemoteHostedAgentChatClient.cs`).
+using the Microsoft Agent Framework Foundry integration.
 
 ```
 BlogWriter/                (console app — orchestration only, calls hosted agents remotely)
@@ -39,6 +39,7 @@ auth, no API keys:
 | Key | Required | Default | Notes |
 | --- | --- | --- | --- |
 | `FOUNDRY_PROJECT_ENDPOINT` | yes | — | e.g. `https://<account>.services.ai.azure.com/api/projects/<project>` |
+| `AZURE_TENANT_ID` | yes | — | Microsoft Entra tenant hosting the Foundry project |
 | `BLOGGER_AGENT_NAME` | no | `Blogger` | Name of the deployed hosted agent |
 | `RESEARCHER_AGENT_NAME` | no | `Researcher` | |
 | `AUTHOR_AGENT_NAME` | no | `Author` | |

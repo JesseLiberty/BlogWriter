@@ -1,0 +1,1 @@
+Routes the BlogWriter workflow to the next best step based on current research, draft, review status, and revision count.

@@ -3,4 +3,7 @@
 **/bin/
 **/obj/
 config.json
+.env
+.env.*
+!.env.example
 .claude/
