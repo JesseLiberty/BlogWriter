@@ -28,8 +28,7 @@ string researcherAgentName = config["RESEARCHER_AGENT_NAME"] ?? "Researcher";
 string authorAgentName = config["AUTHOR_AGENT_NAME"] ?? "Author";
 string reviewerAgentName = config["REVIEWER_AGENT_NAME"] ?? "Reviewer";
 
-// Overridable via user-secrets/env vars; these defaults match the original behaviour.
-int maxOutputTokens = int.TryParse(config["MAX_OUTPUT_TOKENS"], out int configuredMaxOutputTokens) ? configuredMaxOutputTokens : 4096;
+// Cumulative process-wide budget shared by all four MAF-hosted agent clients.
 long maxTotalTokens = long.TryParse(config["MAX_TOTAL_TOKENS"], out long configuredMaxTotalTokens) ? configuredMaxTotalTokens : 40000;
 
 // Entra ID only — no API keys, per repository constraint. Agent Framework owns
@@ -39,10 +38,15 @@ var azureCredential = new AzureCliCredential(new AzureCliCredentialOptions
     TenantId = tenantId,
 });
 AIProjectClient projectClient = new(foundryProjectEndpoint, azureCredential);
+Func<IChatClient, IChatClient> tokenCapFactory = TokenCapChatClient.CreateSharedFactory(maxTotalTokens);
 AIAgent BuildFoundryAgent(string hostedAgentName)
 {
     Uri agentEndpoint = new($"{foundryProjectEndpoint.AbsoluteUri.TrimEnd('/')}/agents/{hostedAgentName}/endpoint/protocols/openai");
-    return projectClient.AsAIAgent(agentEndpoint);
+    return projectClient.AsAIAgent(
+        agentEndpoint,
+        tools: null,
+        clientFactory: tokenCapFactory,
+        services: null);
 }
 
 AIAgent bloggerLlm = BuildFoundryAgent(bloggerAgentName);
@@ -50,19 +54,13 @@ AIAgent researcherLlm = BuildFoundryAgent(researcherAgentName);
 AIAgent authorLlm = BuildFoundryAgent(authorAgentName);
 AIAgent reviewerLlm = BuildFoundryAgent(reviewerAgentName);
 
-var chatOptions = new ChatOptions
-{
-    Temperature = 1,
-    MaxOutputTokens = maxOutputTokens
-};
-
 // Creating a callable object
 using ILoggerFactory loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
 
-var bloggerAgent = new BloggerAgent(bloggerLlm, chatOptions, loggerFactory.CreateLogger<BloggerAgent>());
-var researcherAgent = new ResearcherAgent(researcherLlm, chatOptions, loggerFactory.CreateLogger<ResearcherAgent>());
-var authorAgent = new AuthorAgent(authorLlm, chatOptions, loggerFactory.CreateLogger<AuthorAgent>());
-var reviewerAgent = new ReviewerAgent(reviewerLlm, chatOptions, loggerFactory.CreateLogger<ReviewerAgent>());
+var bloggerAgent = new BloggerAgent(bloggerLlm, loggerFactory.CreateLogger<BloggerAgent>());
+var researcherAgent = new ResearcherAgent(researcherLlm, loggerFactory.CreateLogger<ResearcherAgent>());
+var authorAgent = new AuthorAgent(authorLlm, loggerFactory.CreateLogger<AuthorAgent>());
+var reviewerAgent = new ReviewerAgent(reviewerLlm, loggerFactory.CreateLogger<ReviewerAgent>());
 var app = new BlogWorkflow(bloggerAgent, researcherAgent, authorAgent, reviewerAgent, loggerFactory.CreateLogger<BlogWorkflow>());
 
 // Distributed tracing: an ActivityListener activates every "BlogWriter.*"

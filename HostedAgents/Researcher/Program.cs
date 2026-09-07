@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Azure.AI.AgentServer.Core;
@@ -54,24 +55,35 @@ async Task<HttpResponseMessage> PostWithRetryAsync(string requestUri, object bod
     }
 }
 
-AIFunction tavilyTool = AIFunctionFactory.Create(
-    async (string query, CancellationToken cancellationToken) =>
+// Foundry's function-tool contract consumes only the input schema. Excluding
+// the generated string return schema keeps the tool definition compatible
+// while MAF still returns the search payload to the model at invocation time.
+[Description("Search the web for comprehensive, accurate, and trusted results.")]
+async Task<string> SearchTavilyAsync(
+    [Description("The research query to search for.")] string query,
+    CancellationToken cancellationToken)
+{
+    var request = new
     {
-        var request = new
-        {
-            query,
-            max_results = 5,
-            topic = "general",
-            include_answer = false,
-            include_raw_content = false,
-            search_depth = "basic"
-        };
+        query,
+        max_results = 5,
+        topic = "general",
+        include_answer = false,
+        include_raw_content = false,
+        search_depth = "basic"
+    };
 
-        using HttpResponseMessage response = await PostWithRetryAsync("search", request, cancellationToken);
-        return await response.Content.ReadAsStringAsync(cancellationToken);
-    },
-    name: "tavily_search",
-    description: "A search engine optimized for comprehensive, accurate, and trusted results.");
+    using HttpResponseMessage response = await PostWithRetryAsync("search", request, cancellationToken);
+    return await response.Content.ReadAsStringAsync(cancellationToken);
+}
+
+AIFunction tavilyTool = AIFunctionFactory.Create(
+    SearchTavilyAsync,
+    new AIFunctionFactoryOptions
+    {
+        Name = "tavily_search",
+        ExcludeResultSchema = true,
+    });
 
 // Entra ID only — no API keys, per repository constraint (this applies to the
 // Foundry/model auth; the Tavily key above is a third-party API key, not Foundry auth).
