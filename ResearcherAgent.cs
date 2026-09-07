@@ -31,28 +31,12 @@ public class ResearcherAgent : IResearcherAgent
     // Per-call output-token cap, applied on each RunAsync to bound cost.
     private readonly int? _maxOutputTokens;
 
-    public ResearcherAgent(IChatClient llm, ChatOptions chatOptions, ILogger<ResearcherAgent> logger)
+    public ResearcherAgent(AIAgent agent, ChatOptions chatOptions, ILogger<ResearcherAgent> logger)
     {
         _logger = logger;
         _maxOutputTokens = chatOptions.MaxOutputTokens;
 
-        _agent = new ChatClientAgent(llm, new ChatClientAgentOptions
-        {
-            // Name surfaces in OpenTelemetry traces and agent logs.
-            Name = "Researcher",
-            ChatOptions = new ChatOptions
-            {
-                // Static role/system prompt lives here instead of being concatenated
-                // into every request body.
-                Instructions = Prompts.ResearcherInstructions,
-                // Preserve the original sampling/cost settings.
-                Temperature = chatOptions.Temperature,
-                MaxOutputTokens = chatOptions.MaxOutputTokens,
-            },
-        })
-        .AsBuilder()
-        .UseOpenTelemetry(sourceName: "BlogWriter.Agents")
-        .Build();
+        _agent = agent;
 
         _logger.LogInformation("ResearcherAgent initialized (Tavily tool runs inside the hosted Researcher agent).");
     }

@@ -11,12 +11,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Reused only for the shared Prompts.AuthorInstructions constant (single source
-         of truth with the console app) — no other main-app types are referenced. -->
-    <ProjectReference Include="..\..\BlogWriter.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI.Foundry.Hosting" Version="1.20.0-preview.260831.1" />
     <PackageReference Include="Azure.AI.Projects" Version="2.1.0-beta.4" />
     <PackageReference Include="Azure.Identity" Version="1.21.0" />

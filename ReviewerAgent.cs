@@ -25,24 +25,12 @@ public class ReviewerAgent : IReviewerAgent
     // Per-call output-token cap, applied on each RunAsync to bound cost.
     private readonly int? _maxOutputTokens;
 
-    public ReviewerAgent(IChatClient llm, ChatOptions chatOptions, ILogger<ReviewerAgent> logger)
+    public ReviewerAgent(AIAgent agent, ChatOptions chatOptions, ILogger<ReviewerAgent> logger)
     {
         _logger = logger;
         _maxOutputTokens = chatOptions.MaxOutputTokens;
 
-        _agent = new ChatClientAgent(llm, new ChatClientAgentOptions
-        {
-            Name = "Reviewer",
-            ChatOptions = new ChatOptions
-            {
-                Instructions = Prompts.ReviewerInstructions,
-                Temperature = chatOptions.Temperature,
-                MaxOutputTokens = chatOptions.MaxOutputTokens,
-            },
-        })
-        .AsBuilder()
-        .UseOpenTelemetry(sourceName: "BlogWriter.Agents")
-        .Build();
+        _agent = agent;
         _logger.LogInformation("ReviewerAgent initialized.");
     }
 

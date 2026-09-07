@@ -17,6 +17,5 @@ Set before `azd ai agent run` / `azd deploy`:
 | `AZURE_AI_MODEL_DEPLOYMENT_NAME` | no | `gpt-5-mini` | |
 | `TAVILY_API_KEY` | yes | — | Set via `dotnet user-secrets set "TAVILY_API_KEY" "<value>"` for local runs; use the hosted environment's secret store for deployed runs |
 
-Instructions are sourced from `BlogWriter.Prompts.ResearcherInstructions`
-(shared with the console app via a `ProjectReference` to
-`../../BlogWriter.csproj`) — no local prompt duplication.
+Instructions are compiled from the deployment-local `AgentPrompt.cs`. Keep it
+aligned with `../../Prompts.cs` when changing the Researcher prompt.

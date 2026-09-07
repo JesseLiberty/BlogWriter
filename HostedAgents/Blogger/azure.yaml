@@ -2,30 +2,30 @@
 
 name: blogger
 services:
-    ai-project:
-        host: azure.ai.project
-    blogwriter-blogger:
-        project: .
-        host: azure.ai.agent
-        language: csharp
-        uses:
-            - ai-project
-        description: Routes the BlogWriter workflow to the next best step.
-        codeConfiguration:
-            dependencyResolution: remote_build
-            entryPoint: bin/Debug/net10.0/BlogWriter.HostedAgents.Blogger.dll
-            runtime: dotnet_10
-        container:
-            resources:
-                cpu: "0.5"
-                memory: 1Gi
-        kind: hosted
-        name: blogwriter-blogger
-        environmentVariables:
-            - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
-              value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
-        protocols:
-            - protocol: responses
-              version: 2.0.0
+  ai-project:
+    host: azure.ai.project
+  blogwriter-blogger:
+    project: .
+    host: azure.ai.agent
+    language: csharp
+    uses:
+      - ai-project
+    description: Routes the BlogWriter workflow to the next best step.
+    codeConfiguration:
+      dependencyResolution: remote_build
+      entryPoint: BlogWriter.HostedAgents.Blogger.dll
+      runtime: dotnet_10
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
+    kind: hosted
+    name: blogwriter-blogger
+    environmentVariables:
+      - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+        value: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
+    protocols:
+      - protocol: responses
+        version: 2.0.0
 infra:
-    provider: microsoft.foundry
+  provider: microsoft.foundry

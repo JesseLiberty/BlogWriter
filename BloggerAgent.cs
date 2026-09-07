@@ -33,25 +33,23 @@ public class BloggerAgent : IBloggerAgent
     // Per-call output-token cap, applied on each RunAsync to bound cost.
     private readonly int? _maxOutputTokens;
 
-    public BloggerAgent(IChatClient llm, ChatOptions chatOptions, ILogger<BloggerAgent> logger)
+    public BloggerAgent(AIAgent agent, ChatOptions chatOptions, ILogger<BloggerAgent> logger)
     {
         _logger = logger;
         _maxOutputTokens = chatOptions.MaxOutputTokens;
 
-        _agent = new ChatClientAgent(llm, new ChatClientAgentOptions
+        _agent = agent;
+        _logger.LogInformation("BloggerAgent initialized.");
+    }
+
+    // Compatibility overload for callers that supply an in-process test client.
+    public BloggerAgent(IChatClient llm, ChatOptions chatOptions, ILogger<BloggerAgent> logger)
+        : this(new ChatClientAgent(llm, new ChatClientAgentOptions
         {
             Name = "Blogger",
-            ChatOptions = new ChatOptions
-            {
-                Instructions = Prompts.BloggerInstructions,
-                Temperature = chatOptions.Temperature,
-                MaxOutputTokens = chatOptions.MaxOutputTokens,
-            },
-        })
-        .AsBuilder()
-        .UseOpenTelemetry(sourceName: "BlogWriter.Agents")
-        .Build();
-        _logger.LogInformation("BloggerAgent initialized.");
+            ChatOptions = chatOptions,
+        }), chatOptions, logger)
+    {
     }
 
     public async Task<BloggerDecision> InvokeAsync(ResearchState state, CancellationToken cancellationToken = default)
