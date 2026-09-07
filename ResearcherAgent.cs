@@ -9,7 +9,7 @@ namespace BlogWriter;
 /// Performs research tasks with a <see cref="ChatClientAgent"/> and returns
 /// concise findings.
 ///
-/// The Tavily web-search tool now runs inside the Researcher Foundry Hosted
+/// The web-search tool runs inside the Researcher Foundry Hosted
 /// Agent itself (see HostedAgents/Researcher), not in this process — the
 /// <paramref name="llm"/> passed in is a remote <c>IChatClient</c> talking to
 /// that hosted agent's <c>/responses</c> endpoint, so tool calls happen
@@ -34,7 +34,7 @@ public class ResearcherAgent : IResearcherAgent
 
         _agent = agent;
 
-        _logger.LogInformation("ResearcherAgent initialized (Tavily tool runs inside the hosted Researcher agent).");
+        _logger.LogInformation("ResearcherAgent initialized (web search runs inside the hosted Researcher agent).");
     }
 
     /// <summary>Execute research by letting the agent search and summarise.</summary>
@@ -45,7 +45,7 @@ public class ResearcherAgent : IResearcherAgent
 
         try
         {
-            // A single agent run: the model may call tavily_search one or more
+            // A single agent run: the model may call hosted web search one or more
             // times, read the results, and return a concise summary as its text.
             AgentResponse response = await _agent.RunAsync(query, cancellationToken: cancellationToken);
             string summary = response.Text;

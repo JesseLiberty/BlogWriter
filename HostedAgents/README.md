@@ -11,7 +11,7 @@ never builds or provisions them at runtime.
 | Project | Role | Notes |
 | --- | --- | --- |
 | `Blogger/` | Orchestration decisions (next step routing) | |
-| `Researcher/` | Web research | Owns the Tavily search tool + its API key |
+| `Researcher/` | Web research | Owns a Foundry-hosted web-search tool |
 | `Author/` | Drafts/revises the post | |
 | `Reviewer/` | Approves or requests revisions | |
 
@@ -45,9 +45,8 @@ azd ai agent invoke "Hello!"
 azd ai agent monitor --follow
 ```
 
-Set `FOUNDRY_PROJECT_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME` (and, for
-Researcher, the `TAVILY_API_KEY` user-secret) before `azd ai agent run` /
-`azd deploy` — see each project's own README.
+Set `FOUNDRY_PROJECT_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME` before
+`azd ai agent run` / `azd deploy` — see each project's own README.
 
 > **Note:** `azure.yaml` in each folder is a starting-point manifest, not a
 > generated one — regenerate/replace it via `azd ai agent init` against your

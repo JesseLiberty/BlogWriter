@@ -1,1 +1,1 @@
-Performs current web research for technical .NET and AI blog posts using Tavily search, then summarizes credible findings.
+Performs current web research for technical .NET and AI blog posts using Foundry-hosted web search, then summarizes credible findings.

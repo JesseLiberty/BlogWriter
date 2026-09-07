@@ -165,7 +165,7 @@ foreach (string finding in result.ResearchFindings)
 Console.WriteLine($"\nDraft:\n{result.Draft}");
 Console.WriteLine($"\nReview Notes: {result.ReviewNotes}");
 Console.WriteLine($"Revision Number: {result.RevisionNumber}");
-if (result.RevisionNumber >= ResearchState.MaxRevisions)
+if (result.RevisionLimitReached)
 {
     // The revision cap terminates the loop even if the reviewer never approved —
     // call that out so the draft above isn't mistaken for a reviewer-approved one.

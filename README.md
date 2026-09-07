@@ -20,7 +20,7 @@ using the Microsoft Agent Framework Foundry integration.
 BlogWriter/                (console app — orchestration only, calls hosted agents remotely)
 HostedAgents/
   Blogger/                 (Foundry Hosted Agent — orchestration decisions)
-  Researcher/               (Foundry Hosted Agent — owns the Tavily web-search tool)
+  Researcher/               (Foundry Hosted Agent — owns hosted web search)
   Author/                  (Foundry Hosted Agent — drafts/revises the post)
   Reviewer/                (Foundry Hosted Agent — approves or requests revisions)
 ```
@@ -46,11 +46,8 @@ auth, no API keys:
 | `REVIEWER_AGENT_NAME` | no | `Reviewer` | |
 | `MAX_TOTAL_TOKENS` | no | `40000` | Cumulative process-wide cap (`TokenCapChatClient`) |
 
-`TAVILY_API_KEY` is no longer configured here — it now lives in the
-Researcher hosted agent's own configuration (see `HostedAgents/Researcher/README.md`).
-
 ## Miscellaneous Notes
-* Tavily web search now runs **inside the hosted Researcher agent** — the tool call, HTTP client, and retry logic live in `HostedAgents/Researcher/Program.cs`.
+* Web search runs **inside the hosted Researcher agent** through Foundry's hosted web-search tool.
 * Foundry/model access uses Microsoft Entra ID exclusively; the console app authenticates with `DefaultAzureCredential`.
 * The model deployment is chosen per hosted agent (via `AZURE_AI_MODEL_DEPLOYMENT_NAME` in each `HostedAgents/<Name>` project), not hardcoded in the console app.
 
