@@ -46,6 +46,12 @@ auth, no API keys:
 | `REVIEWER_AGENT_NAME` | no | `Reviewer` | |
 | `MAX_TOTAL_TOKENS` | no | `40000` | Cumulative process-wide cap (`TokenCapChatClient`) |
 
+## Documentation
+* [docs/architecture.md](docs/architecture.md) — full architecture, workflow graph, auth, and token-budget details.
+* [docs/changelog-v1-to-v2.md](docs/changelog-v1-to-v2.md) — what changed from the original in-process design to the current hosted-agent one.
+* [docs/deployment.md](docs/deployment.md) — the `azd` flow for deploying/redeploying each hosted agent and running the console app locally.
+* [docs/configuration.md](docs/configuration.md) — every environment variable/secret used by the console app and the four hosted agents.
+
 ## Miscellaneous Notes
 * Web search runs **inside the hosted Researcher agent** through Foundry's hosted web-search tool.
 * Foundry/model access uses Microsoft Entra ID exclusively; the console app authenticates with `DefaultAzureCredential`.
