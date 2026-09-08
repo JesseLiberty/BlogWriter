@@ -38,17 +38,4 @@ public class TokenCapChatClientTests
         await Assert.ThrowsAsync<TokenCapExceededException>(
             () => client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi again")]));
     }
-
-    [Fact]
-    public async Task SharedFactory_EnforcesOneBudgetAcrossClients()
-    {
-        Func<IChatClient, IChatClient> factory = TokenCapChatClient.CreateSharedFactory(maxTotalTokens: 100);
-        using IChatClient firstClient = factory(new FakeChatClient(totalTokens: 60));
-        using IChatClient secondClient = factory(new FakeChatClient(totalTokens: 60));
-
-        await firstClient.GetResponseAsync([new ChatMessage(ChatRole.User, "first agent")]);
-
-        await Assert.ThrowsAsync<TokenCapExceededException>(
-            () => secondClient.GetResponseAsync([new ChatMessage(ChatRole.User, "second agent")]));
-    }
 }

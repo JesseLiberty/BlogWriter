@@ -38,7 +38,4 @@ public class ResearchState
     /// reached. Drives the bounded review loop; when false the workflow terminates.
     /// </summary>
     public bool NeedsRevision => !IsApproved(ReviewNotes) && RevisionNumber < MaxRevisions;
-
-    /// <summary>True when review ended only because the revision cap was reached.</summary>
-    public bool RevisionLimitReached => !IsApproved(ReviewNotes) && RevisionNumber >= MaxRevisions;
 }

@@ -87,7 +87,3 @@ If none of the above fits, call `MafTour()` for the full capability
 catalogue (every tool / prompt / resource / agent, one line each), or run
 the `maf-help` prompt for guided 3-question triage.
 <!-- END maf-doctor -->
-
-## Microsoft Foundry hosted agents
-
-This project was built with the microsoft-foundry skill. Before working on or answering questions about Foundry agents, read the microsoft-foundry skill first. If you are in VS Code, read the vscode-microsoft-foundry skill first.

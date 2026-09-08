@@ -11,16 +11,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- BlogWriter.Tests and HostedAgents/* are separate projects nested under this folder; exclude them from this project's default glob. -->
+    <!-- BlogWriter.Tests is a separate project nested under this folder; exclude it from this project's default glob. -->
     <Compile Remove="BlogWriter.Tests\**\*.cs" />
-    <Compile Remove="HostedAgents\**\*.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Entra ID auth for RemoteHostedAgentChatClient, which calls each Foundry Hosted
-         Agent's OpenAI-compatible /responses endpoint over a plain HttpClient. -->
-    <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Microsoft.Agents.AI.Foundry" Version="1.20.0-preview.260831.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,12 +21,15 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.9.0" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.10" />
+    <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+    <PackageReference Include="OpenAI" Version="2.11.0" />
   </ItemGroup>
 
 </Project>

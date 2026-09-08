@@ -1,1 +1,0 @@
-Reviews blog drafts for hook, clarity, value, structure, tone, and target length, then approves or provides actionable revision feedback.

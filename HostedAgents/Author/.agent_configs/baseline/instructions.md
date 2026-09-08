@@ -1,1 +1,0 @@
-Drafts and revises complete professional blog posts from research findings and reviewer feedback.

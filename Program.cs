@@ -1,11 +1,13 @@
-﻿using System.Diagnostics;
-using Azure.AI.Projects;
-using Azure.Identity;
+﻿using System.ClientModel;
+using System.Diagnostics;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using BlogWriter;
-using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Client;
+using OpenAI;
 
 // Secrets come from the .NET user-secrets store and from
 // environment variables (secrets win on key collisions).
@@ -18,41 +20,101 @@ string GetRequired(string key) =>
     config[key] ?? throw new InvalidOperationException(
         $"Missing configuration value '{key}'. Set it with: dotnet user-secrets set \"{key}\" \"<value>\"");
 
-// Foundry project + hosted agent names — the 4 agents are pre-provisioned and
-// deployed independently (see HostedAgents/*/README and azd scaffolding);
-// this app only references them by name, it never creates/updates them.
-var foundryProjectEndpoint = new Uri(GetRequired("FOUNDRY_PROJECT_ENDPOINT"));
-string tenantId = GetRequired("AZURE_TENANT_ID");
-string bloggerAgentName = config["BLOGGER_AGENT_NAME"] ?? "Blogger";
-string researcherAgentName = config["RESEARCHER_AGENT_NAME"] ?? "Researcher";
-string authorAgentName = config["AUTHOR_AGENT_NAME"] ?? "Author";
-string reviewerAgentName = config["REVIEWER_AGENT_NAME"] ?? "Reviewer";
+string openAiApiKey = GetRequired("API_KEY");
+string openAiApiBase = GetRequired("OPENAI_BASE_URL");
+string tavilyApiKey = GetRequired("TAVILY_API_KEY");
 
-// Cumulative process-wide budget shared by all four MAF-hosted agent clients.
+// Overridable via user-secrets/env vars; these defaults match the original behaviour.
+string modelName = config["MODEL_NAME"] ?? "gpt-5-mini";
+int maxOutputTokens = int.TryParse(config["MAX_OUTPUT_TOKENS"], out int configuredMaxOutputTokens) ? configuredMaxOutputTokens : 4096;
 long maxTotalTokens = long.TryParse(config["MAX_TOTAL_TOKENS"], out long configuredMaxTotalTokens) ? configuredMaxTotalTokens : 40000;
+if (!Uri.TryCreate(openAiApiBase, UriKind.Absolute, out var uri))
+{
+    throw new InvalidOperationException($"Invalid URI: '{openAiApiBase}'");
+}
+var openAIClient = new OpenAIClient(
+    new ApiKeyCredential(openAiApiKey),
+    new OpenAIClientOptions
+    {
+        Endpoint = new Uri(openAiApiBase),
+        // The SDK's default RetryPolicy still applies on top of this; this only
+        // bounds how long a single network attempt can hang before it retries/fails.
+        NetworkTimeout = TimeSpan.FromSeconds(60),
+    });
 
-// Entra ID only — no API keys, per repository constraint. Agent Framework owns
-// the Foundry transport and Responses protocol details.
-var azureCredential = new AzureCliCredential(new AzureCliCredentialOptions
+// Build the IChatClient pipeline once and share it across all agents.
+// UseFunctionInvocation() adds the middleware that actually *executes* the tool
+// calls the model requests — without it, attaching the Tavily tool to the
+// Researcher agent would let the model ask for a search but nothing would run it.
+//
+// UseOpenTelemetry() emits a GenAI span per model round-trip (model name, token
+// usage, tool calls). Its source is named "BlogWriter.ChatClient" so the
+// ActivityListener registered below (which listens to every "BlogWriter.*"
+// source) captures it alongside the agent/workflow spans — no TracerProvider
+// or extra packages required.
+//
+// TokenCapChatClient is registered *after* function invocation, which makes it
+// the innermost wrapper around the raw client — so it observes every individual
+// model round-trip (including the extra calls tool invocation triggers) and
+// enforces a hard cumulative-token budget for the whole process.
+TokenCapChatClient? tokenCapChatClient = null;
+IChatClient llm = openAIClient
+    .GetChatClient(modelName)
+    .AsIChatClient()
+    .AsBuilder()
+    .UseFunctionInvocation()
+    .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
+    .Use(inner => tokenCapChatClient = new TokenCapChatClient(inner, maxTotalTokens))
+    .Build();
+
+var chatOptions = new ChatOptions
 {
-    TenantId = tenantId,
-});
-AIProjectClient projectClient = new(foundryProjectEndpoint, azureCredential);
-Func<IChatClient, IChatClient> tokenCapFactory = TokenCapChatClient.CreateSharedFactory(maxTotalTokens);
-AIAgent BuildFoundryAgent(string hostedAgentName)
+    Temperature = 1,
+    MaxOutputTokens = maxOutputTokens
+};
+
+var tavilyHttpClient = new HttpClient { BaseAddress = new Uri("https://api.tavily.com/"), Timeout = TimeSpan.FromSeconds(20) };
+tavilyHttpClient.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Bearer", tavilyApiKey);
+
+// Small manual retry: transient network errors/timeouts get up to 2 retries
+// with exponential backoff before the failure surfaces to the calling agent.
+async Task<HttpResponseMessage> PostWithRetryAsync(string requestUri, object body, CancellationToken cancellationToken)
 {
-    Uri agentEndpoint = new($"{foundryProjectEndpoint.AbsoluteUri.TrimEnd('/')}/agents/{hostedAgentName}/endpoint/protocols/openai");
-    return projectClient.AsAIAgent(
-        agentEndpoint,
-        tools: null,
-        clientFactory: tokenCapFactory,
-        services: null);
+    const int maxAttempts = 3;
+    for (int attempt = 1; ; attempt++)
+    {
+        try
+        {
+            HttpResponseMessage response = await tavilyHttpClient.PostAsJsonAsync(requestUri, body, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return response;
+        }
+        catch (Exception ex) when (attempt < maxAttempts && ex is HttpRequestException or TaskCanceledException)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)), cancellationToken);
+        }
+    }
 }
 
-AIAgent bloggerLlm = BuildFoundryAgent(bloggerAgentName);
-AIAgent researcherLlm = BuildFoundryAgent(researcherAgentName);
-AIAgent authorLlm = BuildFoundryAgent(authorAgentName);
-AIAgent reviewerLlm = BuildFoundryAgent(reviewerAgentName);
+AIFunction tavilyTool = AIFunctionFactory.Create(
+    async (string query, CancellationToken cancellationToken) =>
+    {
+        var request = new
+        {
+            query,
+            max_results = 5,
+            topic = "general",
+            include_answer = false,
+            include_raw_content = false,
+            search_depth = "basic"
+        };
+
+        using HttpResponseMessage response = await PostWithRetryAsync("search", request, cancellationToken);
+        return await response.Content.ReadAsStringAsync(cancellationToken);
+    },
+    name: "tavily_search",
+    description: "A search engine optimized for comprehensive, accurate, and trusted results.");
 
 // Creating a callable object
 using ILoggerFactory loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
@@ -79,10 +141,10 @@ catch (Exception ex)
     startupLogger.LogWarning(ex, "Microsoft Learn MCP server unavailable; continuing with Tavily-only research tools.");
 }
 
-var bloggerAgent = new BloggerAgent(bloggerLlm, loggerFactory.CreateLogger<BloggerAgent>());
-var researcherAgent = new ResearcherAgent(researcherLlm, loggerFactory.CreateLogger<ResearcherAgent>());
-var authorAgent = new AuthorAgent(authorLlm, loggerFactory.CreateLogger<AuthorAgent>());
-var reviewerAgent = new ReviewerAgent(reviewerLlm, loggerFactory.CreateLogger<ReviewerAgent>());
+var bloggerAgent = new BloggerAgent(llm, chatOptions, loggerFactory.CreateLogger<BloggerAgent>());
+var researcherAgent = new ResearcherAgent(llm, chatOptions, researcherTools, loggerFactory.CreateLogger<ResearcherAgent>());
+var authorAgent = new AuthorAgent(llm, chatOptions, loggerFactory.CreateLogger<AuthorAgent>());
+var reviewerAgent = new ReviewerAgent(llm, chatOptions, loggerFactory.CreateLogger<ReviewerAgent>());
 var app = new BlogWorkflow(bloggerAgent, researcherAgent, authorAgent, reviewerAgent, loggerFactory.CreateLogger<BlogWorkflow>());
 
 // Distributed tracing: an ActivityListener activates every "BlogWriter.*"
@@ -184,10 +246,10 @@ foreach (string finding in result.ResearchFindings)
     Console.WriteLine($"- {finding}");
 }
 
-Console.WriteLine($"\nDraft:\n{result.Draft}");
-Console.WriteLine($"\nReview Notes: {result.ReviewNotes}");
-Console.WriteLine($"Revision Number: {result.RevisionNumber}");
-if (result.RevisionLimitReached)
+Console.WriteLine($"\n\n========== Draft ==========\n\n{result.Draft}");
+Console.WriteLine($"\n========== Review Notes ==========\n{result.ReviewNotes}");
+Console.WriteLine($"\n========== Revision Notes ==========\n{result.RevisionNumber}");
+if (result.RevisionNumber >= ResearchState.MaxRevisions)
 {
     // The revision cap terminates the loop even if the reviewer never approved —
     // call that out so the draft above isn't mistaken for a reviewer-approved one.
@@ -195,4 +257,14 @@ if (result.RevisionLimitReached)
 }
 Console.WriteLine("\n=============================\n");
 
+if (tokenCapChatClient is not null)
+{
+    TokenUsageSnapshot usage = tokenCapChatClient.UsageSnapshot;
+    Console.WriteLine("\n========== TOKEN USAGE ==========");
+    Console.WriteLine($"Input tokens:     {usage.InputTokens}");
+    Console.WriteLine($"Output tokens:    {usage.OutputTokens}");
+    Console.WriteLine($"Reasoning tokens: {usage.ReasoningTokens}");
+    Console.WriteLine($"Total tokens:     {usage.TotalTokens}");
+    Console.WriteLine("==================================");
+}
 
