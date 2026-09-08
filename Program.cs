@@ -56,6 +56,28 @@ AIAgent reviewerLlm = BuildFoundryAgent(reviewerAgentName);
 
 // Creating a callable object
 using ILoggerFactory loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+ILogger startupLogger = loggerFactory.CreateLogger("BlogWriter.Startup");
+
+// Microsoft Learn's remote MCP server exposes docs search/fetch tools the
+// Researcher can call alongside Tavily for authoritative Microsoft/Azure content.
+// If the remote endpoint is unreachable/slow/erroring at startup, don't let it
+// take down the whole app — fall back to Tavily-only tools.
+List<AIFunction> researcherTools = [tavilyTool];
+try
+{
+    McpClient microsoftLearnMcp = await McpClient.CreateAsync(
+        new HttpClientTransport(new HttpClientTransportOptions
+        {
+            Endpoint = new Uri("https://learn.microsoft.com/api/mcp"),
+            Name = "microsoft-learn",
+        }));
+    IList<McpClientTool> microsoftLearnTools = await microsoftLearnMcp.ListToolsAsync();
+    researcherTools.AddRange(microsoftLearnTools);
+}
+catch (Exception ex)
+{
+    startupLogger.LogWarning(ex, "Microsoft Learn MCP server unavailable; continuing with Tavily-only research tools.");
+}
 
 var bloggerAgent = new BloggerAgent(bloggerLlm, loggerFactory.CreateLogger<BloggerAgent>());
 var researcherAgent = new ResearcherAgent(researcherLlm, loggerFactory.CreateLogger<ResearcherAgent>());
@@ -171,6 +193,6 @@ if (result.RevisionLimitReached)
     // call that out so the draft above isn't mistaken for a reviewer-approved one.
     Console.WriteLine("Note: Maximum revision limit reached; draft above printed as-is.");
 }
-Console.WriteLine("=============================");
+Console.WriteLine("\n=============================\n");
 
 
