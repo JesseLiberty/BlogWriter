@@ -29,6 +29,7 @@ From inside each `HostedAgents/<Name>` folder:
 ```powershell
 # First time only: scaffold azd wiring for this folder (or hand-author azure.yaml — see below)
 azd ai agent init --deploy-mode code
+azd ai agent init --infra=bicep
 
 # Provision Foundry project/model/ACR resources (skip if reusing an existing project)
 azd provision

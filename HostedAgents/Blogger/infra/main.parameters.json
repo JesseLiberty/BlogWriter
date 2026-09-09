@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "connectionCredentials": {
+      "value": {}
+    },
+    "connections": {
+      "value": []
+    },
+    "deployments": {
+      "value": []
+    },
+    "projectEndpoint": {
+      "value": "${FOUNDRY_PROJECT_ENDPOINT}"
+    },
+    "projectResourceId": {
+      "value": "${AZURE_AI_PROJECT_ID}"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "agentSubnetName": {
+      "value": "agent-subnet"
+    },
+    "agentSubnetPrefix": {
+      "value": ""
+    },
+    "connectionCredentials": {
+      "value": {}
+    },
+    "connections": {
+      "value": []
+    },
+    "createAgentSubnet": {
+      "value": false
+    },
+    "createPESubnet": {
+      "value": false
+    },
+    "deployments": {
+      "value": []
+    },
+    "dnsZonesResourceGroup": {
+      "value": ""
+    },
+    "dnsZonesSubscription": {
+      "value": ""
+    },
+    "enableNetworkIsolation": {
+      "value": false
+    },
+    "includeAcr": {
+      "value": false
+    },
+    "managedIsolationMode": {
+      "value": ""
+    },
+    "peSubnetName": {
+      "value": "pe-subnet"
+    },
+    "peSubnetPrefix": {
+      "value": ""
+    },
+    "useManagedEgress": {
+      "value": false
+    },
+    "vnetId": {
+      "value": ""
+    }
+  }
+}

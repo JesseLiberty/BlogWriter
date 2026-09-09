@@ -21,6 +21,7 @@ From inside each `HostedAgents/<Name>` folder (`Blogger`, `Researcher`, `Author`
 ```powershell
 # First time only per project — scaffold/replace azure.yaml against your real Foundry project
 azd ai agent init --deploy-mode code
+azd ai agent init --infra=bicep
 
 # Provision Foundry project/model/ACR resources (skip if reusing an existing project)
 azd provision
