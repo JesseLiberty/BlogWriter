@@ -1,0 +1,8 @@
+name: smoke-core
+agent:
+    name: blogwriter-reviewer
+    kind: hosted
+    config: .agent_configs\baseline\metadata.yaml
+options:
+    eval_model: gpt-5-mini
+max_samples: 15
