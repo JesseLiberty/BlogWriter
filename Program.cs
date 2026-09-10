@@ -118,7 +118,7 @@ Console.CancelKeyPress += (_, e) =>
 
 while (!cts.IsCancellationRequested)
 {
-    Console.Write("Enter a topic, 'resume <session-id>', or press Enter to exit: ");
+    Console.Write("\nEnter a topic, 'resume <session-id>', or press Enter to exit: ");
     string? input = Console.ReadLine();
     if (string.IsNullOrWhiteSpace(input))
     {
@@ -193,18 +193,18 @@ while (!cts.IsCancellationRequested)
 void PrintResults(BlogSession session)
 {
     ResearchState result = session.State;
-    Console.WriteLine("\n========== RESULTS ==========");
-    Console.WriteLine($"Session: {session.Id}");
-    Console.WriteLine($"Task: {result.MainTask}");
-    Console.WriteLine($"\nResearch Findings ({result.ResearchFindings.Count}):");
+    Console.WriteLine("\n\n========== RESULTS ==========");
+    Console.WriteLine($"\nSession: {session.Id}");
+    Console.WriteLine($"\nTask: {result.MainTask}");
+    Console.WriteLine($"\n\n===Research Findings===\n ({result.ResearchFindings.Count}):");
     foreach (string finding in result.ResearchFindings)
     {
         Console.WriteLine($"- {finding}");
     }
 
-    Console.WriteLine($"\nDraft:\n{result.Draft}");
-    Console.WriteLine($"\nReview Notes: {result.ReviewNotes}");
-    Console.WriteLine($"Revision Number: {result.RevisionNumber}");
+    Console.WriteLine($"\n\n===Draft:===\n{result.Draft}");
+    Console.WriteLine($"\n\n===Review Notes:===\n {result.ReviewNotes}");
+    Console.WriteLine($"\n\nRevision Number: {result.RevisionNumber}");
     if (result.RevisionLimitReached)
     {
         Console.WriteLine("Note: Maximum revision limit reached; draft above printed as-is.");
