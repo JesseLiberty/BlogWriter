@@ -50,6 +50,21 @@ terminates, either on reviewer approval or on hitting the revision cap.
 console app never issues a raw HTTP call to an agent endpoint.** This is a hard
 constraint of this codebase (see `AGENTS.md`), not just a convention.
 
+## Relationship betwen Hosted Agents and Agents
+Under `HostedAgents` there is, e.g., `Author` as a project. In the main project there is `AuthorAgent`.
+
+`Author` and `AuthorAgent` are two halves of the same distributed design:
+
+`Author` is the deployable Azure AI Foundry Hosted Agent. Its Program.cs creates an `AIAgent` with the Author instructions and exposes it through the `Responses` protocol. azure.yaml packages and deploys it as the `Author/blogwriter-author service`.
+
+`AuthorAgent.cs` is the local workflow adapter. The main app connects to the hosted agent by name in Program.cs, wraps the remote endpoint as an `AIAgent`, and passes that client into `AuthorAgent`.
+
+During execution, `AuthorAgent` converts `ResearchState` into a prompt, calls the remote hosted agent with _agent.RunAsync(...), then writes the returned draft back into ResearchState. It also owns workflow concerns such as logging, tracing, revision counting, error handling, and fallback drafts.
+
+**They are not the same class and are not directly project-referenced. The hosted project is independently deployable; communication happens over the Foundry Responses endpoint.**
+
+One detail to maintain: the Author instructions are duplicated in Prompts.cs and AgentPrompt.cs. The hosted copy is used at deployment/runtime, while the root copy documents or supports the local architecture, so changes should keep both aligned.
+
 ## Authentication
 
 Every hop — console app → hosted agent, and hosted agent → Foundry model/tools — uses
