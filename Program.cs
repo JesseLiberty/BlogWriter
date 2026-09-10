@@ -79,16 +79,9 @@ ActivitySource.AddActivityListener(new ActivityListener
         Console.WriteLine($"[trace] \u2190 {activity.DisplayName} ({activity.Duration.TotalMilliseconds:F0} ms)")
 });
 
-Console.Write("Enter your topic: ");
-string topic = Console.ReadLine() ?? string.Empty;
-
-int minWords = ReadWordCount(
-    $"Enter minimum word count [{ResearchState.DefaultMinWords}]: ",
-    ResearchState.DefaultMinWords);
-int maxWords = ReadWordCount(
-    $"Enter maximum word count [{ResearchState.DefaultMaxWords}]: ",
-    ResearchState.DefaultMaxWords,
-    minimum: minWords);
+string sessionDirectory = config["BLOG_SESSION_STORE_PATH"]
+    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BlogWriter", "sessions");
+IBlogSessionStore sessionStore = new FileBlogSessionStore(sessionDirectory);
 
 // Prompts for a positive word count, re-asking until a valid value (or blank
 // for the default) is entered. `minimum`, when set, enforces max >= min.
@@ -114,14 +107,6 @@ int ReadWordCount(string prompt, int defaultValue, int? minimum = null)
     }
 }
 
-// Run the workflow for the entered topic
-var initialState = new ResearchState
-{
-    MainTask = topic,
-    MinWords = minWords,
-    MaxWords = maxWords
-};
-
 // Ctrl+C requests a graceful cancellation of the in-flight run instead of an
 // abrupt process kill.
 using var cts = new CancellationTokenSource();
@@ -131,46 +116,100 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-ResearchState result;
-try
+while (!cts.IsCancellationRequested)
 {
-    using Activity? runActivity = appActivitySource.StartActivity("BlogWriter.Run");
-    runActivity?.SetTag("blog.topic", topic);
-    result = await app.RunAsync(initialState, cts.Token);
-}
-catch (TokenCapExceededException ex)
-{
-    // Graceful shutdown: the exception unwinds the call stack so every `using`
-    // (logger factory, HTTP clients, etc.) is disposed before we exit.
-    Console.Error.WriteLine($"{ex.Message} Exiting application.");
-    Environment.ExitCode = 1;
-    return;
-}
-catch (OperationCanceledException)
-{
-    Console.Error.WriteLine("Run cancelled. Exiting application.");
-    Environment.ExitCode = 1;
-    return;
+    Console.Write("Enter a topic, 'resume <session-id>', or press Enter to exit: ");
+    string? input = Console.ReadLine();
+    if (string.IsNullOrWhiteSpace(input))
+    {
+        break;
+    }
+
+    BlogSession? session = null;
+    const string resumePrefix = "resume ";
+    if (input.StartsWith(resumePrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        string sessionId = input[resumePrefix.Length..].Trim();
+        session = await sessionStore.GetAsync(sessionId, cts.Token);
+        if (session is null)
+        {
+            Console.Error.WriteLine("Session not found. Check the session ID and configured session store path.");
+            continue;
+        }
+    }
+    else
+    {
+        int minWords = ReadWordCount(
+            $"Enter minimum word count [{ResearchState.DefaultMinWords}]: ",
+            ResearchState.DefaultMinWords);
+        int maxWords = ReadWordCount(
+            $"Enter maximum word count [{ResearchState.DefaultMaxWords}]: ",
+            ResearchState.DefaultMaxWords,
+            minimum: minWords);
+
+        session = await sessionStore.CreateAsync(new ResearchState
+        {
+            MainTask = input,
+            MinWords = minWords,
+            MaxWords = maxWords
+        }, cts.Token);
+    }
+
+    while (!cts.IsCancellationRequested)
+    {
+        try
+        {
+            using Activity? runActivity = appActivitySource.StartActivity("BlogWriter.Run");
+            runActivity?.SetTag("blog.topic", session.State.MainTask);
+            session.State = await app.RunAsync(session.State, cts.Token);
+            await sessionStore.SaveAsync(session, cts.Token);
+        }
+        catch (TokenCapExceededException ex)
+        {
+            Console.Error.WriteLine($"{ex.Message} Exiting application.");
+            Environment.ExitCode = 1;
+            return;
+        }
+        catch (OperationCanceledException)
+        {
+            Console.Error.WriteLine("Run cancelled. Exiting application.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        PrintResults(session);
+        Console.Write("Follow-up request, or press Enter for a new topic: ");
+        string? followUp = Console.ReadLine();
+        if (string.IsNullOrWhiteSpace(followUp))
+        {
+            break;
+        }
+
+        session!.State.StartFollowUp(followUp);
+        await sessionStore.SaveAsync(session, cts.Token);
+    }
 }
 
-Console.WriteLine("\n========== RESULTS ==========");
-Console.WriteLine($"Task: {result.MainTask}");
-
-Console.WriteLine($"\nResearch Findings ({result.ResearchFindings.Count}):");
-foreach (string finding in result.ResearchFindings)
+void PrintResults(BlogSession session)
 {
-    Console.WriteLine($"- {finding}");
-}
+    ResearchState result = session.State;
+    Console.WriteLine("\n========== RESULTS ==========");
+    Console.WriteLine($"Session: {session.Id}");
+    Console.WriteLine($"Task: {result.MainTask}");
+    Console.WriteLine($"\nResearch Findings ({result.ResearchFindings.Count}):");
+    foreach (string finding in result.ResearchFindings)
+    {
+        Console.WriteLine($"- {finding}");
+    }
 
-Console.WriteLine($"\nDraft:\n{result.Draft}");
-Console.WriteLine($"\nReview Notes: {result.ReviewNotes}");
-Console.WriteLine($"Revision Number: {result.RevisionNumber}");
-if (result.RevisionLimitReached)
-{
-    // The revision cap terminates the loop even if the reviewer never approved —
-    // call that out so the draft above isn't mistaken for a reviewer-approved one.
-    Console.WriteLine("Note: Maximum revision limit reached; draft above printed as-is.");
+    Console.WriteLine($"\nDraft:\n{result.Draft}");
+    Console.WriteLine($"\nReview Notes: {result.ReviewNotes}");
+    Console.WriteLine($"Revision Number: {result.RevisionNumber}");
+    if (result.RevisionLimitReached)
+    {
+        Console.WriteLine("Note: Maximum revision limit reached; draft above printed as-is.");
+    }
+    Console.WriteLine("=============================");
 }
-Console.WriteLine("=============================");
 
 

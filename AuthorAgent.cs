@@ -29,6 +29,16 @@ public class AuthorAgent : IAuthorAgent
         _logger.LogInformation("AuthorAgent initialized.");
     }
 
+    // Compatibility overload for callers that supply an in-process test client.
+    public AuthorAgent(IChatClient llm, ChatOptions chatOptions, ILogger<AuthorAgent> logger)
+        : this(new ChatClientAgent(llm, new ChatClientAgentOptions
+        {
+            Name = "Author",
+            ChatOptions = chatOptions,
+        }), logger)
+    {
+    }
+
     public async Task<string?> InvokeAsync(ResearchState state, CancellationToken cancellationToken = default)
     {
         using Activity? activity = s_activitySource.StartActivity("Author.Invoke");
@@ -47,6 +57,8 @@ public class AuthorAgent : IAuthorAgent
             Current Draft: {(string.IsNullOrEmpty(state.Draft) ? "(none — write the first draft)" : state.Draft)}
 
             Review Notes: {(string.IsNullOrEmpty(state.ReviewNotes) ? "(none)" : state.ReviewNotes)}
+
+            User Follow-Up: {(string.IsNullOrEmpty(state.CurrentSubTask) ? "(none)" : state.CurrentSubTask)}
 
             Target Word Count: {state.MinWords} to {state.MaxWords} words
             """;

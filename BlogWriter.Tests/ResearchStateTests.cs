@@ -64,4 +64,27 @@ public class ResearchStateTests
 
         Assert.Equal(expected, state.RevisionLimitReached);
     }
+
+    [Fact]
+    public void StartFollowUp_PreservesDraftAndResearchButResetsReviewCycle()
+    {
+        var state = new ResearchState
+        {
+            MainTask = "topic",
+            ResearchFindings = ["finding"],
+            Draft = "draft",
+            ReviewNotes = ResearchState.ApprovedMarker,
+            RevisionNumber = ResearchState.MaxRevisions,
+            NextStep = "END",
+        };
+
+        state.StartFollowUp("Add a caching section.");
+
+        Assert.Equal("Add a caching section.", state.CurrentSubTask);
+        Assert.Equal("draft", state.Draft);
+        Assert.Equal(["finding"], state.ResearchFindings);
+        Assert.Empty(state.ReviewNotes);
+        Assert.Equal(0, state.RevisionNumber);
+        Assert.Empty(state.NextStep);
+    }
 }
