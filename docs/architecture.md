@@ -72,7 +72,7 @@ Microsoft Entra ID exclusively (`AzureCliCredential` locally, `DefaultAzureCrede
 the hosted agents). There are no API keys anywhere in this architecture.
 
 ## Session Object
-The console now saves each workflow result as JSON under `%LOCALAPPDATA%\BlogWriter\sessions` by default. It prints the `session ID` after each run, accepts follow-up revision requests immediately, and supports resume <session-id> after restarting the app.
+The console now saves each workflow result as JSON under `%LOCALAPPDATA%\BlogWriter\sessions` by default. It prints the `session ID` after each run, accepts follow-up revision requests immediately, and supports `resume <session-id>` after restarting the app.
 
 ## Shared token budget
 
