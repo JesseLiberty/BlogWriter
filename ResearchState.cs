@@ -29,6 +29,16 @@ public class ResearchState
     public string NextStep { get; set; } = "";
     public string CurrentSubTask { get; set; } = "";
 
+    /// <summary>Prepares an approved or revision-capped draft for a user-requested follow-up.</summary>
+    public void StartFollowUp(string followUp)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(followUp);
+        CurrentSubTask = followUp.Trim();
+        ReviewNotes = "";
+        RevisionNumber = 0;
+        NextStep = "";
+    }
+
     /// <summary>True when the given review text contains the approval marker (case-insensitive).</summary>
     public static bool IsApproved(string? reviewNotes) =>
         !string.IsNullOrEmpty(reviewNotes) && reviewNotes.Contains(ApprovedMarker, StringComparison.OrdinalIgnoreCase);

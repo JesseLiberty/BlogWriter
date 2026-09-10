@@ -17,6 +17,7 @@ keys — every credential is Microsoft Entra ID (`AzureCliCredential` locally,
 | `AUTHOR_AGENT_NAME` | no | `Author` | |
 | `REVIEWER_AGENT_NAME` | no | `Reviewer` | |
 | `MAX_TOTAL_TOKENS` | no | `40000` | Cumulative cross-agent token cap (`TokenCapChatClient`); parse failures fall back to the default |
+| `BLOG_SESSION_STORE_PATH` | no | `%LOCALAPPDATA%\BlogWriter\sessions` | Local directory where completed conversations are stored as JSON files |
 
 Set with, e.g.:
 

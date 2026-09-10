@@ -60,6 +60,10 @@ dotnet run --project .
 
 It will prompt for a topic and a min/max word count, then stream workflow progress
 (`[trace] → ...` / `[trace] ← ...` lines) before printing the final approved draft.
+After a run, enter a follow-up request to revise the same draft; the console app
+persists the session locally under `%LOCALAPPDATA%\BlogWriter\sessions` by default.
+The result prints the session ID; use `resume <session-id>` at the next topic prompt
+to continue it after restarting the console app.
 
 ## 4. Verifying a deployment
 
