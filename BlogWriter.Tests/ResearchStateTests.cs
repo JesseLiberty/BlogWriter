@@ -87,4 +87,22 @@ public class ResearchStateTests
         Assert.Equal(0, state.RevisionNumber);
         Assert.Empty(state.NextStep);
     }
+
+    [Fact]
+    public void BuildResearchQuery_IncludesOriginalTopicAndFollowUpRefinement()
+    {
+        var state = new ResearchState
+        {
+            MainTask = "How to build a blog app",
+            ResearchFindings = ["Concepts: context, prompts, and workflow.", "Drafting is done after research."],
+            CurrentSubTask = "Add a caching section."
+        };
+
+        string query = state.BuildResearchQuery();
+
+        Assert.Contains("How to build a blog app", query);
+        Assert.Contains("Add a caching section.", query);
+        Assert.Contains("Concepts: context, prompts, and workflow.", query);
+        Assert.Contains("Drafting is done after research.", query);
+    }
 }
