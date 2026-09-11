@@ -69,13 +69,17 @@ public class ResearcherAgent : IResearcherAgent
     /// <summary>Research node that gathers information.</summary>
     public async Task<ResearchState> ResearchNodeAsync(ResearchState state, CancellationToken cancellationToken = default)
     {
-        string subTask = !string.IsNullOrEmpty(state.CurrentSubTask) ? state.CurrentSubTask : state.MainTask;
-        _logger.LogInformation("Researching: {SubTask}", subTask);
+        string query = state.BuildResearchQuery();
+        string researchLabel = !string.IsNullOrWhiteSpace(state.CurrentSubTask)
+            ? state.CurrentSubTask
+            : state.MainTask;
+
+        _logger.LogInformation("Researching: {SubTask}", researchLabel);
 
         string findings;
         try
         {
-            findings = await InvokeAsync(subTask, cancellationToken);
+            findings = await InvokeAsync(query, cancellationToken);
             string preview = findings.Length > 100 ? findings[..100] : findings;
             _logger.LogInformation("Found: {Preview}...", preview);
         }
@@ -86,8 +90,8 @@ public class ResearcherAgent : IResearcherAgent
         }
         catch (Exception e)
         {
-            _logger.LogError(e, "Research failed for sub-task '{SubTask}'.", subTask);
-            findings = $"Research on {subTask} - information gathered";
+            _logger.LogError(e, "Research failed for query '{Query}'.", query);
+            findings = $"Research on {researchLabel} - information gathered";
         }
 
         state.ResearchFindings.Add(findings);

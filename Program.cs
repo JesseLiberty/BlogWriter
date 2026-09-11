@@ -194,7 +194,6 @@ void PrintResults(BlogSession session)
 {
     ResearchState result = session.State;
     Console.WriteLine("\n\n========== RESULTS ==========");
-    Console.WriteLine($"\nSession: {session.Id}");
     Console.WriteLine($"\nTask: {result.MainTask}");
     Console.WriteLine($"\n\n===Research Findings===\n ({result.ResearchFindings.Count}):");
     foreach (string finding in result.ResearchFindings)
@@ -202,13 +201,16 @@ void PrintResults(BlogSession session)
         Console.WriteLine($"- {finding}");
     }
 
-    Console.WriteLine($"\n\n===Draft:===\n{result.Draft}");
     Console.WriteLine($"\n\n===Review Notes:===\n {result.ReviewNotes}");
-    Console.WriteLine($"\n\nRevision Number: {result.RevisionNumber}");
+    Console.WriteLine($"\n\n===Draft:===\n{result.Draft}");
+
     if (result.RevisionLimitReached)
     {
         Console.WriteLine("Note: Maximum revision limit reached; draft above printed as-is.");
     }
+    Console.WriteLine("=============================");
+    Console.WriteLine($"\n\nRevision Number: {result.RevisionNumber}");
+    Console.WriteLine($"\nSession: {session.Id}\n");
     Console.WriteLine("=============================");
 }
 
