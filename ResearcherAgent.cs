@@ -74,6 +74,7 @@ public class ResearcherAgent : IResearcherAgent
             ? state.CurrentSubTask
             : state.MainTask;
 
+        Console.WriteLine($"Researching topic: {query}");
         _logger.LogInformation("Researching: {SubTask}", researchLabel);
 
         string findings;

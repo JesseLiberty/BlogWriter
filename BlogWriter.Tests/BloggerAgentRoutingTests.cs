@@ -32,6 +32,26 @@ public class BloggerAgentRoutingTests
     }
 
     [Fact]
+    public async Task RefinementResetsState_AndRoutesToResearcher()
+    {
+        var state = new ResearchState
+        {
+            MainTask = "topic",
+            ResearchFindings = ["some findings"],
+            CurrentSubTask = "Add a caching section.",
+            Draft = "a draft",
+            ReviewNotes = ResearchState.ApprovedMarker,
+        };
+
+        state.StartFollowUp("Add a caching section.");
+        BloggerDecision decision = await CreateAgent().InvokeAsync(state);
+
+        Assert.Equal("researcher", decision.NextStep);
+        Assert.Empty(state.Draft);
+        Assert.Empty(state.ResearchFindings);
+    }
+
+    [Fact]
     public async Task DraftWithNoReview_RoutesToReviewer()
     {
         var state = new ResearchState

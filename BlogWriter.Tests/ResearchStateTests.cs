@@ -66,7 +66,7 @@ public class ResearchStateTests
     }
 
     [Fact]
-    public void StartFollowUp_PreservesDraftAndResearchButResetsReviewCycle()
+    public void StartFollowUp_ResetsResearchAndDraftSoRefinedSearchTriggersFreshResearch()
     {
         var state = new ResearchState
         {
@@ -81,8 +81,8 @@ public class ResearchStateTests
         state.StartFollowUp("Add a caching section.");
 
         Assert.Equal("Add a caching section.", state.CurrentSubTask);
-        Assert.Equal("draft", state.Draft);
-        Assert.Equal(["finding"], state.ResearchFindings);
+        Assert.Empty(state.Draft);
+        Assert.Empty(state.ResearchFindings);
         Assert.Empty(state.ReviewNotes);
         Assert.Equal(0, state.RevisionNumber);
         Assert.Empty(state.NextStep);
