@@ -77,7 +77,11 @@ public class ResearchState
         return string.Join("\n\n", parts);
     }
 
-    /// <summary>Prepares an approved or revision-capped draft for a user-requested follow-up.</summary>
+    /// <summary>
+    /// Prepares a user-requested follow-up as a fresh research cycle. Any prior
+    /// draft or completed research is discarded so the blogger re-enters the
+    /// researcher stage and the refined query becomes the new source of truth.
+    /// </summary>
     public void StartFollowUp(string followUp)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(followUp);
@@ -91,6 +95,12 @@ public class ResearchState
 
         SearchRefinements.Add(trimmed);
         CurrentSubTask = trimmed;
+
+        // A refinement is a fresh research pass, not a continuation of the old
+        // one. Clear stale completion state so the blogger routes back to the
+        // researcher with the refined query instead of reusing the prior draft.
+        Draft = "";
+        ResearchFindings.Clear();
         ReviewNotes = "";
         RevisionNumber = 0;
         NextStep = "";
