@@ -1,1 +1,12 @@
-Delimarsky, D., & Riem, M. (2026). Spec Kit (Version 0.10.2) [Computer software]. https://github.com/github/spec-kit
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "Spec Kit"
+version: "0.10.2"
+authors:
+  - family-names: "Delimarsky"
+    given-names: "D."
+  - family-names: "Riem"
+    given-names: "M."
+date-released: "2026"
+type: "software"
+url: "https://github.com/github/spec-kit"
