@@ -86,6 +86,6 @@ auth, no API keys:
 ## Additional Features
 
 * Middleware is used to manage the tools.
-* OpenTelemetry is used to manage logging and emits a GenAI span per model round-trip
-* ChatOptions sets the temperature to 0 for maximum consistency
+* OpenTelemetry is used to manage logging and emits a GenAI span per model round-trip.
+* ChatOptions sets the temperature to 0 for maximum consistency.
 
