@@ -1,4 +1,4 @@
-# BlogWriter, an open Source project is [documented here](https://jesseliberty.com)
+# BlogWriter, an open source project is [documented here](https://jesseliberty.com)
 
 This program, **Blog Writer**, is designed to research and write blog posts. It was written with *Microsoft Agent Framework* and the principal actors are the **BloggerAgent** which works as the orchestrator, the **ResearcherAgent** which goes out to the Web to research the requested topic, the **AuthorAgent** which then writes the blog post, and the **ReviewerAgent** which reviews the proposed blog post, sending it back to the AuthorAgent if it is not approved.
 
