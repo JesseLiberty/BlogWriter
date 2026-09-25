@@ -89,6 +89,3 @@ auth, no API keys:
 * OpenTelemetry is used to manage logging and emits a GenAI span per model round-trip
 * ChatOptions sets the temperature to 0 for maximum consistency
 
-## Known Issues
-
-We are seeing a lot of calls to the LLM. Either there is a problem with the calls or with the telemetry.
