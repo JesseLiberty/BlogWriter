@@ -1,10 +1,8 @@
-# Demo code associated with a [series of blog posts](https://jesseliberty.com)
+# BlogWriter, an open Source project is [documented here](https://jesseliberty.com)
 
-This demonstration program, **Blog Writer**, is designed to research and write blog posts. It was written with *Microsoft Agent Framework* and the principal actors are the **BloggerAgent** which works as the orchestrator, the **ResearcherAgent** which goes out to the Web to research the requested topic, the **AuthorAgent** which then writes the blog post, and the **ReviewerAgent** which reviews the proposed blog post, sending it back to the AuthorAgent if it is not approved.
+This program, **Blog Writer**, is designed to research and write blog posts. It was written with *Microsoft Agent Framework* and the principal actors are the **BloggerAgent** which works as the orchestrator, the **ResearcherAgent** which goes out to the Web to research the requested topic, the **AuthorAgent** which then writes the blog post, and the **ReviewerAgent** which reviews the proposed blog post, sending it back to the AuthorAgent if it is not approved.
 
-The system prompts for each agent is contained in Prompts.cs
-
-BlogWorkflow is responsible for creating the nodes and edges for moving through the workflow and also contains the logic for managing a breach of the token-cap (the maximum number of tokens that can be used in a single request, as defined in TokenCapChatClient).
+*Note: BlogWriter was written as a demonstration program and is not ready for production.*
 
 ## Blazor web interface
 
@@ -94,11 +92,3 @@ auth, no API keys:
 ## Known Issues
 
 We are seeing a lot of calls to the LLM. Either there is a problem with the calls or with the telemetry.
-
-## Next Steps
-
-* The `Microsoft.Agents.AI.Foundry.Hosting` package used by `HostedAgents/*` is still prerelease — re-validate before production use.
-* Decide whether the Researcher's hosted agent should also expose the Responses+Invocations combo, or add more Foundry Toolbox tools (Code Interpreter, Azure AI Search) now that it's hosted.
-
-## Contributing
-Please read Contributing.md before contributing. Thank you.
