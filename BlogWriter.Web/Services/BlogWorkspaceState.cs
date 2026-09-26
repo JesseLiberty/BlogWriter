@@ -112,10 +112,7 @@ public sealed class BlogWorkspaceState
         !IsBusy &&
         Mode != WorkspaceMode.List &&
         Mode != WorkspaceMode.Ended &&
-        HasDraft &&
-        IsRevisionRequested &&
-        !string.IsNullOrWhiteSpace(InitialPrompt) &&
-        string.IsNullOrWhiteSpace(RevisionPrompt);
+        !string.IsNullOrWhiteSpace(InitialPrompt);
 
     /// <summary>
     /// The writing prompt is locked while revising; New unlocks it again.

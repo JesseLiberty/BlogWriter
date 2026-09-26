@@ -27,32 +27,52 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task NewState_DisablesRevisionInputUntilDraftExists()
-    {
-        var workspace = new BlogWorkspaceService(new StubSessionService(), TimeSpan.FromMilliseconds(25));
-
-        Assert.False(workspace.State.IsRevisionInputEnabled);
-
-        await workspace.NewAsync(true);
-
-        Assert.False(workspace.State.IsRevisionInputEnabled);
-    }
-
-    [Fact]
-    public void RevisionInput_EnablesOnceDraftHasText()
+    public void RevisionInput_EnablesForNonEmptyQueryBeforeDraftExists()
     {
         var state = new BlogWorkspaceState();
-        state.InitialPrompt = "topic";
 
-        state.Draft = "  ";
         Assert.False(state.IsRevisionInputEnabled);
 
-        state.Draft = "draft";
+        state.InitialPrompt = "topic";
+
+        Assert.False(state.HasDraft);
         Assert.True(state.IsRevisionInputEnabled);
     }
 
     [Fact]
-    public void RevisionInput_DisablesWhenDraftIsCleared()
+    public void RevisionInput_IgnoresDraftAndRevisionTextWhenQueryIsPresent()
+    {
+        var state = new BlogWorkspaceState();
+        state.InitialPrompt = "topic";
+
+        Assert.True(state.IsRevisionInputEnabled);
+        state.RevisionPrompt = "make it shorter";
+        Assert.True(state.IsRevisionInputEnabled);
+
+        state.Draft = "draft";
+        Assert.True(state.IsRevisionInputEnabled);
+        state.Draft = "";
+        Assert.True(state.IsRevisionInputEnabled);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t")]
+    public void RevisionInput_DisablesForEmptyOrWhitespaceQuery(string query)
+    {
+        var state = new BlogWorkspaceState
+        {
+            InitialPrompt = query,
+            Draft = "draft",
+            RevisionPrompt = "revise the introduction",
+        };
+
+        Assert.False(state.IsRevisionInputEnabled);
+    }
+
+    [Fact]
+    public void RevisionInput_RemainsEnabledWhenDraftIsClearedWhileQueryRemains()
     {
         var workspace = new BlogWorkspaceService(new StubSessionService(), TimeSpan.FromMilliseconds(25));
         workspace.State.InitialPrompt = "topic";
@@ -60,7 +80,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         workspace.State.Draft = "";
 
-        Assert.False(workspace.State.IsRevisionInputEnabled);
+    Assert.True(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]
@@ -506,6 +526,17 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         Assert.True(workspace.State.IsSelectionVisible);
         Assert.False(workspace.State.IsRevisionInputEnabled);
         Assert.Equal(2, workspace.State.DisplayedSessions.Count);
+    }
+
+    [Fact]
+    public async Task RevisionInput_RemainsDisabledWhenWorkspaceEnds()
+    {
+        var workspace = new BlogWorkspaceService(new StubSessionService(), TimeSpan.FromMilliseconds(25));
+        workspace.State.InitialPrompt = "topic";
+
+        await workspace.QuitAsync(discardConfirmed: true);
+
+        Assert.False(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]

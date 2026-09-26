@@ -118,6 +118,29 @@ public sealed class HomePageTests : BunitContext
     }
 
     [Fact]
+    public void Home_RevisionWindowTracksQueryNotDraftOrRevisionText()
+    {
+        BlogWorkspaceService workspace = RegisterWorkspace();
+        IRenderedComponent<Home> cut = Render<Home>();
+        var revision = cut.Find("#revision-prompt");
+
+        Assert.True(revision.HasAttribute("disabled"));
+
+        cut.Find("#initial-prompt").Input("topic");
+
+        Assert.False(revision.HasAttribute("disabled"));
+        Assert.False(workspace.State.HasDraft);
+
+        revision.Input("revise the introduction");
+
+        Assert.False(revision.HasAttribute("disabled"));
+
+        cut.Find("#initial-prompt").Input("  ");
+
+        Assert.True(revision.HasAttribute("disabled"));
+    }
+
+    [Fact]
     public async Task Home_GoDisablesWorkspaceControlsUntilDraftIsPublished()
     {
         var sessions = new StubSessionService { PendingStart = new TaskCompletionSource<BlogSession>() };
@@ -182,7 +205,7 @@ public sealed class HomePageTests : BunitContext
     }
 
     [Fact]
-    public async Task Home_PopulatedDraftOnlyEnablesEmptyRevisionAndKeepsItLockedAfterRevision()
+    public async Task Home_PopulatedDraftKeepsRevisionEnabledWhileQueryIsPresent()
     {
         BlogWorkspaceService workspace = RegisterWorkspace();
         workspace.State.InitialPrompt = "topic";
@@ -194,12 +217,12 @@ public sealed class HomePageTests : BunitContext
         Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
 
         cut.Find("#revision-prompt").Input("make it shorter");
-        cut.WaitForAssertion(() => Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled")));
+        cut.WaitForAssertion(() => Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled")));
 
         cut.Find("button[data-command='go']").Click();
         cut.WaitForAssertion(() => Assert.Contains("revised", workspace.State.Draft));
 
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
         Assert.False(cut.Find("button[data-command='go']").HasAttribute("disabled"));
     }
 
@@ -304,13 +327,13 @@ public sealed class HomePageTests : BunitContext
     }
 
     [Fact]
-    public void Home_RevisionFieldLatchesOnDraftUntilNew()
+    public void Home_RevisionFieldTracksQueryRatherThanDraft()
     {
         BlogWorkspaceService workspace = RegisterWorkspace();
         workspace.State.InitialPrompt = "topic";
         IRenderedComponent<Home> cut = Render<Home>();
 
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
 
         workspace.State.Draft = "draft";
         cut.Render();
@@ -320,7 +343,7 @@ public sealed class HomePageTests : BunitContext
         workspace.State.Draft = "  ";
         cut.Render();
 
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
 
         cut.Find("button[data-command='new']").Click();
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[role='dialog']")));
