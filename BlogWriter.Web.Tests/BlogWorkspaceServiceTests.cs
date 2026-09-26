@@ -42,6 +42,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     public void RevisionInput_EnablesOnceDraftHasText()
     {
         var state = new BlogWorkspaceState();
+        state.InitialPrompt = "topic";
 
         state.Draft = "  ";
         Assert.False(state.IsRevisionInputEnabled);
@@ -51,14 +52,15 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public void RevisionInput_StaysEnabledWhenDraftIsCleared()
+    public void RevisionInput_DisablesWhenDraftIsCleared()
     {
         var workspace = new BlogWorkspaceService(new StubSessionService(), TimeSpan.FromMilliseconds(25));
+        workspace.State.InitialPrompt = "topic";
         workspace.State.Draft = "draft";
 
         workspace.State.Draft = "";
 
-        Assert.True(workspace.State.IsRevisionInputEnabled);
+        Assert.False(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]
@@ -103,6 +105,61 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         Assert.Equal("1 saved sessions loaded.", workspace.State.CurrentStatus);
         Assert.Equal(WorkflowOutputOutcome.Success, workspace.State.CurrentStatusOutcome);
+    }
+
+    [Fact]
+    public async Task ListAsync_ExposesBusyStateBeforeSessionFetchAndClearsItOnSuccess()
+    {
+        var sessions = new StubSessionService { PendingList = new TaskCompletionSource<IReadOnlyList<BlogSessionSummary>>() };
+        var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
+
+        Task listing = workspace.ListAsync(discardConfirmed: false);
+        await sessions.ListStarted.Task;
+
+        Assert.True(workspace.State.IsListing);
+        Assert.False(workspace.State.IsWordRangeEnabled);
+        Assert.False(workspace.State.IsGoCommandEnabled);
+        Assert.True(workspace.State.IsNewCommandEnabled);
+
+        sessions.PendingList.SetResult([CreateSummary("saved")]);
+        await listing;
+
+        Assert.False(workspace.State.IsListing);
+        Assert.Equal(WorkspaceMode.List, workspace.State.Mode);
+        Assert.True(workspace.State.IsSelectionInputEnabled);
+    }
+
+    [Fact]
+    public async Task ListAsync_ClearsBusyStateWhenSessionFetchFails()
+    {
+        var sessions = new StubSessionService { PendingList = new TaskCompletionSource<IReadOnlyList<BlogSessionSummary>>() };
+        var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
+
+        Task listing = workspace.ListAsync(discardConfirmed: false);
+        await sessions.ListStarted.Task;
+        sessions.PendingList.SetException(new InvalidOperationException("list unavailable"));
+        await listing;
+
+        Assert.False(workspace.State.IsListing);
+        Assert.Equal(WorkspaceMode.Draft, workspace.State.Mode);
+        Assert.True(workspace.State.IsNewCommandEnabled);
+    }
+
+    [Fact]
+    public async Task NewAsync_SupersedesPendingListResult()
+    {
+        var sessions = new StubSessionService { PendingList = new TaskCompletionSource<IReadOnlyList<BlogSessionSummary>>() };
+        var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
+
+        Task listing = workspace.ListAsync(discardConfirmed: false);
+        await sessions.ListStarted.Task;
+        await workspace.NewAsync(discardConfirmed: true);
+        sessions.PendingList.SetResult([CreateSummary("stale")]);
+        await listing;
+
+        Assert.Equal(WorkspaceMode.New, workspace.State.Mode);
+        Assert.False(workspace.State.IsListing);
+        Assert.Empty(workspace.State.DisplayedSessions);
     }
     [Fact]
     public void NewWorkspace_UsesDefaultWordRange()
@@ -669,7 +726,9 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         public IReadOnlyList<BlogSessionSummary> Summaries { get; set; } = [];
         public BlogSession? SessionToLoad { get; init; }
         public TaskCompletionSource<BlogSession>? PendingStart { get; init; }
+        public TaskCompletionSource<IReadOnlyList<BlogSessionSummary>>? PendingList { get; init; }
         public TaskCompletionSource Started { get; } = new();
+        public TaskCompletionSource ListStarted { get; } = new();
         public IProgress<WorkflowOutputUpdate>? LastOutput { get; private set; }
 
         public Task<BlogSession> StartAsync(string prompt, int minWords = ResearchState.DefaultMinWords, int maxWords = ResearchState.DefaultMaxWords, CancellationToken cancellationToken = default, IProgress<WorkflowOutputUpdate>? output = null)
@@ -724,8 +783,11 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
             });
         }
 
-        public Task<IReadOnlyList<BlogSessionSummary>> ListAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(Summaries);
+        public Task<IReadOnlyList<BlogSessionSummary>> ListAsync(CancellationToken cancellationToken = default)
+        {
+            ListStarted.TrySetResult();
+            return PendingList?.Task ?? Task.FromResult(Summaries);
+        }
 
         public Task<BlogSession?> LoadAsync(string sessionId, CancellationToken cancellationToken = default)
         {

@@ -1,7 +1,7 @@
 <nav class="command-bar" aria-label="Workspace commands">
-    <button type="button" data-command="new" @onclick="New">New</button>
+    <button type="button" data-command="new" disabled="@(!NewEnabled)" @onclick="New">New</button>
     <div class="list-command">
-        <button type="button" data-command="list" @onclick="List">List</button>
+        <button type="button" data-command="list" disabled="@(!ListEnabled)" @onclick="List">List</button>
         @if (SelectionVisible)
         {
             <label class="sr-only" for="command-session-number">Saved session number</label>
@@ -11,6 +11,7 @@
                    maxlength="3"
                    pattern="[0-9]*"
                    value="@SelectionInput"
+                   disabled="@(!SelectionEnabled)"
                    aria-invalid="@(!string.IsNullOrWhiteSpace(SelectionError))"
                    aria-describedby="command-session-error"
                    @onchange="HandleSelectionChanged" />
@@ -20,9 +21,9 @@
             }
         }
     </div>
-    <button type="button" class="range-go" data-command="go" @onclick="Go">Go</button>
-    <button type="button" data-command="quit" @onclick="Quit">Quit</button>
-    <button type="button" class="help-command" data-command="help" aria-label="Help" @onclick="Help">?</button>
+    <button type="button" class="range-go" data-command="go" disabled="@(!GoEnabled)" @onclick="Go">Go</button>
+    <button type="button" data-command="quit" disabled="@(!QuitEnabled)" @onclick="Quit">Quit</button>
+    <button type="button" class="help-command" data-command="help" disabled="@(!HelpEnabled)" aria-label="Help" @onclick="Help">?</button>
 </nav>
 
 @code {
@@ -39,10 +40,28 @@
     public bool SelectionVisible { get; set; }
 
     [Parameter]
+    public bool SelectionEnabled { get; set; } = true;
+
+    [Parameter]
     public string SelectionInput { get; set; } = "";
 
     [Parameter]
     public string? SelectionError { get; set; }
+
+    [Parameter]
+    public bool NewEnabled { get; set; } = true;
+
+    [Parameter]
+    public bool ListEnabled { get; set; } = true;
+
+    [Parameter]
+    public bool GoEnabled { get; set; } = true;
+
+    [Parameter]
+    public bool QuitEnabled { get; set; } = true;
+
+    [Parameter]
+    public bool HelpEnabled { get; set; } = true;
 
     [Parameter]
     public EventCallback Quit { get; set; }

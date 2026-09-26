@@ -46,6 +46,7 @@ public sealed class BlogWorkspaceState
     public string SelectionInput { get; set; } = "";
     public string? SelectionError { get; internal set; }
     public bool IsProcessing { get; internal set; }
+    public bool IsListing { get; internal set; }
     public string? StatusMessage { get; internal set; }
     public string? ValidationMessage { get; internal set; }
     public IReadOnlyList<WorkflowLogEntry> WorkflowLog { get; internal set; } = [];
@@ -91,7 +92,15 @@ public sealed class BlogWorkspaceState
     }
 
     public bool IsSelectionVisible => Mode == WorkspaceMode.List;
+    public bool IsSelectionInputEnabled => Mode == WorkspaceMode.List && !IsBusy;
     public bool HasDraft => !string.IsNullOrWhiteSpace(Draft);
+    public bool IsWordRangeEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
+
+    public bool IsNewCommandEnabled => !IsProcessing && Mode != WorkspaceMode.Ended;
+    public bool IsListCommandEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
+    public bool IsGoCommandEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
+    public bool IsQuitCommandEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
+    public bool IsHelpCommandEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
 
     /// <summary>
     /// Latched once the draft window has text or a saved session is selected, and
@@ -99,12 +108,21 @@ public sealed class BlogWorkspaceState
     /// </summary>
     public bool IsRevisionRequested { get; internal set; }
 
-    public bool IsRevisionInputEnabled => !IsProcessing && IsRevisionRequested;
+    public bool IsRevisionInputEnabled =>
+        !IsBusy &&
+        Mode != WorkspaceMode.List &&
+        Mode != WorkspaceMode.Ended &&
+        HasDraft &&
+        IsRevisionRequested &&
+        !string.IsNullOrWhiteSpace(InitialPrompt) &&
+        string.IsNullOrWhiteSpace(RevisionPrompt);
 
     /// <summary>
     /// The writing prompt is locked while revising; New unlocks it again.
     /// </summary>
-    public bool IsInitialPromptEnabled => !IsProcessing && !IsRevisionRequested;
+    public bool IsInitialPromptEnabled => !IsBusy && Mode == WorkspaceMode.New && !IsRevisionRequested;
+
+    private bool IsBusy => IsProcessing || IsListing;
 
     /// <summary>
     /// Prompt text as last accepted by a completed writing operation. Prompts keep their

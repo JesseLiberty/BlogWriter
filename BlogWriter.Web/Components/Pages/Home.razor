@@ -38,7 +38,8 @@
                          Disabled="@(!Workspace.State.IsRevisionInputEnabled)" />
         </section>
 
-        <WordRangeInput MinValue="@Workspace.State.MinWordsInput"
+        <WordRangeInput Disabled="@(!Workspace.State.IsWordRangeEnabled)"
+            MinValue="@Workspace.State.MinWordsInput"
                 MinValueChanged="Workspace.UpdateMinWords"
                 MaxValue="@Workspace.State.MaxWordsInput"
                 MaxValueChanged="Workspace.UpdateMaxWords"
@@ -71,8 +72,14 @@
                         List="() => RequestTransitionAsync(PendingAction.List)"
                         SelectionChanged="Workspace.LaunchSelectionAsync"
                         SelectionVisible="@Workspace.State.IsSelectionVisible"
+                        SelectionEnabled="@Workspace.State.IsSelectionInputEnabled"
                         SelectionInput="@Workspace.State.SelectionInput"
                         SelectionError="@Workspace.State.SelectionError"
+                        NewEnabled="@Workspace.State.IsNewCommandEnabled"
+                        ListEnabled="@Workspace.State.IsListCommandEnabled"
+                        GoEnabled="@Workspace.State.IsGoCommandEnabled"
+                        QuitEnabled="@Workspace.State.IsQuitCommandEnabled"
+                        HelpEnabled="@Workspace.State.IsHelpCommandEnabled"
                         Go="Workspace.SubmitAsync"
                         Quit="() => RequestTransitionAsync(PendingAction.Quit)"
                         Help="ShowHelp" />

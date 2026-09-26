@@ -119,6 +119,7 @@ public sealed class BlogWorkspaceService : IDisposable
         }
 
         await CancelActiveOperationAsync();
+        long listVersion = ++_operationVersion;
         RestoreAcceptedRange();
         State.InitialPrompt = "";
         State.RevisionPrompt = "";
@@ -126,13 +127,20 @@ public sealed class BlogWorkspaceService : IDisposable
         State.SelectionInput = "";
         State.SelectionError = null;
         State.ValidationMessage = null;
+        State.IsListing = true;
         State.StatusMessage = "Loading saved sessions...";
         State.AppendLog(State.StatusMessage, WorkflowOutputOutcome.Progress);
         NotifyChanged();
 
         try
         {
-            State.DisplayedSessions = (await _sessions.ListAsync()).Take(20).ToList();
+            IReadOnlyList<BlogSessionSummary> summaries = await _sessions.ListAsync();
+            if (listVersion != _operationVersion)
+            {
+                return WorkspaceTransitionResult.Completed;
+            }
+
+            State.DisplayedSessions = summaries.Take(20).ToList();
             State.Mode = WorkspaceMode.List;
             State.StatusMessage = State.DisplayedSessions.Count == 0
                 ? "No saved sessions are available."
@@ -141,10 +149,22 @@ public sealed class BlogWorkspaceService : IDisposable
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            if (listVersion != _operationVersion)
+            {
+                return WorkspaceTransitionResult.Completed;
+            }
+
             State.DisplayedSessions = [];
             State.Mode = WorkspaceMode.Draft;
             State.ValidationMessage = "Unable to load saved sessions. Try again.";
             State.StatusMessage = null;
+        }
+        finally
+        {
+            if (listVersion == _operationVersion)
+            {
+                State.IsListing = false;
+            }
         }
 
         NotifyChanged();
@@ -441,6 +461,7 @@ public sealed class BlogWorkspaceService : IDisposable
         State.DisplayedSessions = [];
         State.SelectionInput = "";
         State.SelectionError = null;
+        State.IsListing = false;
         State.IsProcessing = false;
         State.StatusMessage = null;
         State.ValidationMessage = null;

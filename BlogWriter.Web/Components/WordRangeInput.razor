@@ -8,6 +8,7 @@
                inputmode="numeric"
                pattern="[0-9]*"
                value="@MinValue"
+               disabled="@Disabled"
                @oninput="args => MinValueChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)"
                aria-invalid="@(MinError is null ? "false" : "true")"
                aria-describedby="@(MinError is null ? "min-words-help" : "min-words-help min-words-error")" />
@@ -27,6 +28,7 @@
                inputmode="numeric"
                pattern="[0-9]*"
                value="@MaxValue"
+               disabled="@Disabled"
                @oninput="args => MaxValueChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)"
                aria-invalid="@(MaxError is null ? "false" : "true")"
                aria-describedby="@(MaxError is null ? "max-words-help" : "max-words-help max-words-error")" />
@@ -40,6 +42,9 @@
 </section>
 
 @code {
+    [Parameter]
+    public bool Disabled { get; set; }
+
     [Parameter]
     public string MinValue { get; set; } = ResearchState.DefaultMinWords.ToString();
 
