@@ -80,7 +80,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         workspace.State.Draft = "";
 
-    Assert.True(workspace.State.IsRevisionInputEnabled);
+        Assert.True(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]
