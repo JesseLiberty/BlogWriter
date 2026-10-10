@@ -69,7 +69,10 @@ public class BlogWorkflow(
             {
                 case ExecutorInvokedEvent invoked:
                     logger.LogInformation("[workflow] -> {ExecutorId} started", invoked.ExecutorId);
-                    publisher.PublishLifecycle(WorkflowOutputOutcome.Progress, $"{invoked.ExecutorId} started.");
+                    publisher.PublishLifecycle(
+                        WorkflowOutputOutcome.Progress,
+                        $"{invoked.ExecutorId} started.",
+                        GetAgentStage(invoked.ExecutorId));
                     break;
 
                 case ExecutorCompletedEvent completed:
@@ -102,6 +105,15 @@ public class BlogWorkflow(
         // Fall back to the input state only if no output event was ever produced.
         return result ?? state;
     }
+
+    private static WorkflowAgentStage GetAgentStage(string executorId) => executorId switch
+    {
+        "Blogger" => WorkflowAgentStage.Blogger,
+        "Researcher" => WorkflowAgentStage.Researcher,
+        "Author" => WorkflowAgentStage.Author,
+        "Reviewer" => WorkflowAgentStage.Reviewer,
+        _ => WorkflowAgentStage.None,
+    };
 
     // Walks the exception chain (including AggregateException children) looking
     // for a token-cap breach, which the workflow runtime may have wrapped.

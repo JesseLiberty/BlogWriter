@@ -66,17 +66,20 @@ public sealed class CosmosBlogSessionStore(
     {
         string ownerId = await _ownerProvider.GetOwnerIdAsync(cancellationToken);
         var query = new QueryDefinition(
-            "SELECT TOP 20 c.id AS Id, c.State.MainTask AS MainTask, c.CreatedAt AS CreatedAt, c.UpdatedAt AS UpdatedAt " +
+            "SELECT TOP 20 c.id AS Id, c.State.MainTask AS MainTask, c.CreatedAt AS CreatedAt, c.UpdatedAt AS UpdatedAt, " +
+            "c.State.MinWords AS MinWords, c.State.MaxWords AS MaxWords, c.State.Draft AS Draft " +
             "FROM c WHERE c.OwnerId = @ownerId ORDER BY c.UpdatedAt DESC")
             .WithParameter("@ownerId", ownerId);
-        using FeedIterator<BlogSessionSummary> iterator = _container.GetItemQueryIterator<BlogSessionSummary>(
+        using FeedIterator<SessionListProjection> iterator = _container.GetItemQueryIterator<SessionListProjection>(
             query,
             requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(ownerId) });
         var sessions = new List<BlogSessionSummary>();
         while (iterator.HasMoreResults)
         {
-            FeedResponse<BlogSessionSummary> page = await iterator.ReadNextAsync(cancellationToken);
-            sessions.AddRange(page);
+            FeedResponse<SessionListProjection> page = await iterator.ReadNextAsync(cancellationToken);
+            sessions.AddRange(page.Select(session => BlogSessionSummary.Create(
+                session.Id, session.MainTask, session.CreatedAt, session.UpdatedAt,
+                session.MinWords, session.MaxWords, session.Draft)));
         }
 
         _logger.LogInformation("Listed {SessionCount} saved sessions.", sessions.Count);
@@ -139,6 +142,17 @@ public sealed class CosmosBlogSessionStore(
         }
 
         _logger.LogInformation("Deleted sessions for an account lifecycle event.");
+    }
+
+    private sealed class SessionListProjection
+    {
+        public string Id { get; set; } = "";
+        public string MainTask { get; set; } = "";
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
+        public int MinWords { get; set; } = ResearchState.DefaultMinWords;
+        public int MaxWords { get; set; } = ResearchState.DefaultMaxWords;
+        public string? Draft { get; set; }
     }
 
     private static bool IsValidId(string sessionId) => Guid.TryParseExact(sessionId, "N", out _);

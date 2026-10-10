@@ -134,11 +134,11 @@ button, a { touch-action: manipulation; }
 .empty-copy { color: var(--muted); }
 .review-copy { border-left: 3px solid var(--forest); padding-left: 14px; }
 
-.session-list { display: grid; gap: 0; }
+.session-list { min-width: 0; display: grid; gap: 0; white-space: normal; }
 button.session-entry {
     width: 100%;
     display: grid;
-    grid-template-columns: 3.2rem 1fr;
+    grid-template-columns: 3.2rem minmax(0, 1fr);
     gap: 8px;
     padding: 12px 0;
     border: 0;
@@ -153,8 +153,14 @@ button.session-entry {
 button.session-entry:hover:not(:disabled) { background: rgba(30, 90, 70, .07); }
 button.session-entry:disabled { opacity: .65; cursor: wait; }
 .session-number { color: var(--coral); font-weight: 500; }
+.session-details { min-width: 0; display: grid; gap: 8px; overflow-wrap: anywhere; }
 .session-entry strong, .session-entry time { display: block; }
-.session-entry time { margin-top: 5px; color: var(--muted); font-size: .7rem; }
+.session-metadata { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); font-size: .7rem; line-height: 1.5; }
+.session-word-limits { min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.session-entry time { color: var(--muted); font-size: .7rem; }
+.session-preview { min-width: 0; display: grid; gap: 4px; line-height: 1.5; }
+.session-preview-label { color: var(--muted); font-size: .68rem; }
+.session-preview-text { min-width: 0; font-size: .8rem; }
 
 .workspace-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px 16px; }
 .command-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: end; }
@@ -181,6 +187,9 @@ button.session-entry:disabled { opacity: .65; cursor: wait; }
 .command-bar button[data-command="list"], .command-bar button[data-command="help"], .command-bar button[data-command="go"] { border-color: var(--forest-dark); background: var(--forest); color: white; }
 .command-bar button[data-command="list"]:hover:not(:disabled), .command-bar button[data-command="help"]:hover:not(:disabled), .command-bar button[data-command="go"]:hover:not(:disabled) { background: var(--forest-dark); }
 .command-bar button[data-command="list"]:active:not(:disabled), .command-bar button[data-command="help"]:active:not(:disabled), .command-bar button[data-command="go"]:active:not(:disabled) { background: var(--forest-deep); }
+.command-bar button[data-command="stop"]:not(:disabled) { border-color: darkred; background: red; color: yellow; }
+.command-bar button[data-command="stop"]:hover:not(:disabled) { background: #c00; color: yellow; }
+.command-bar button[data-command="stop"]:active:not(:disabled) { background: darkred; color: yellow; }
 .command-bar button:disabled,
 .command-bar button:disabled:hover,
 .command-bar button:disabled:active { border-color: var(--line); background: #ecece7; color: #8a918c; cursor: not-allowed; }
@@ -217,7 +226,7 @@ button.session-entry:disabled { opacity: .65; cursor: wait; }
     .work-grid { min-height: 0; }
     .pane-content { max-height: 25vh; }
     .workspace-footer { display: flex; align-items: stretch; flex-direction: column; }
-    .command-bar { width: 100%; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .command-bar { width: 100%; grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .list-command { gap: 4px; }
     .list-command button { flex-basis: auto; min-width: 0; }
     .workflow-log { max-height: 4.8rem; }
@@ -226,13 +235,14 @@ button.session-entry:disabled { opacity: .65; cursor: wait; }
 
 @media (max-width: 900px) {
     .workspace-footer { grid-template-columns: minmax(0, 1fr); }
-    .command-bar { width: 100%; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .command-bar { width: 100%; grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .command-leading, .command-trailing { display: contents; }
     .command-leading > button[data-command="new"] { grid-column: 1; grid-row: 1; }
     .list-command { grid-column: 2; grid-row: 1; }
     .command-trailing > button[data-command="go"] { grid-column: 3; grid-row: 1; }
-    .command-trailing > button[data-command="quit"] { grid-column: 4; grid-row: 1; }
-    .command-trailing > button[data-command="help"] { grid-column: 5; grid-row: 1; }
+    .command-trailing > button[data-command="stop"] { grid-column: 4; grid-row: 1; }
+    .command-trailing > button[data-command="quit"] { grid-column: 5; grid-row: 1; }
+    .command-trailing > button[data-command="help"] { grid-column: 6; grid-row: 1; }
     .command-range { grid-column: 1 / -1; grid-row: 2; }
     .command-range .word-range-row {
         width: min(100%, 390px);

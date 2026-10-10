@@ -17,6 +17,15 @@ public enum WorkflowOutputOutcome
     Review,
 }
 
+public enum WorkflowAgentStage
+{
+    None,
+    Blogger,
+    Researcher,
+    Author,
+    Reviewer,
+}
+
 public sealed record WorkflowOutputUpdate
 {
     private WorkflowOutputUpdate(
@@ -26,7 +35,8 @@ public sealed record WorkflowOutputUpdate
         long operationVersion,
         long sequence,
         string updateKey,
-        int? revisionNumber)
+        int? revisionNumber,
+        WorkflowAgentStage agentStage)
     {
         Kind = kind;
         Outcome = outcome;
@@ -35,6 +45,7 @@ public sealed record WorkflowOutputUpdate
         Sequence = sequence;
         UpdateKey = updateKey;
         RevisionNumber = revisionNumber;
+        AgentStage = agentStage;
     }
 
     public WorkflowOutputKind Kind { get; }
@@ -44,6 +55,7 @@ public sealed record WorkflowOutputUpdate
     public long Sequence { get; }
     public string UpdateKey { get; }
     public int? RevisionNumber { get; }
+    public WorkflowAgentStage AgentStage { get; }
 
     public static WorkflowOutputUpdate Create(
         WorkflowOutputKind kind,
@@ -52,7 +64,8 @@ public sealed record WorkflowOutputUpdate
         long operationVersion,
         long sequence,
         string updateKey,
-        int? revisionNumber = null)
+        int? revisionNumber = null,
+        WorkflowAgentStage agentStage = WorkflowAgentStage.None)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
         ArgumentException.ThrowIfNullOrWhiteSpace(updateKey);
@@ -66,6 +79,7 @@ public sealed record WorkflowOutputUpdate
             operationVersion,
             sequence,
             updateKey,
-            revisionNumber);
+            revisionNumber,
+            agentStage);
     }
 }

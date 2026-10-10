@@ -33,9 +33,67 @@ public sealed class BlogWorkflowTests
         Assert.Contains(output.Updates, update =>
             update.Kind == WorkflowOutputKind.Lifecycle &&
             update.Outcome == WorkflowOutputOutcome.Success);
+        Assert.Contains(output.Updates, update => update.AgentStage == WorkflowAgentStage.Blogger);
+        Assert.Contains(output.Updates, update => update.AgentStage == WorkflowAgentStage.Researcher);
+        Assert.Contains(output.Updates, update => update.AgentStage == WorkflowAgentStage.Author);
+        Assert.Contains(output.Updates, update => update.AgentStage == WorkflowAgentStage.Reviewer);
+        Assert.All(
+            output.Updates.Where(update => update.Kind == WorkflowOutputKind.Lifecycle && update.Message.EndsWith("completed.", StringComparison.Ordinal)),
+            update => Assert.Equal(WorkflowAgentStage.None, update.AgentStage));
         Assert.Equal(output.Updates.Count, output.Updates.Select(update => update.Sequence).Distinct().Count());
         Assert.Equal(1, author.Calls);
         Assert.Equal(1, reviewer.Calls);
+    }
+
+    [Fact]
+    public async Task RunAsync_CancellationDuringResearcherDoesNotInvokeDownstreamAgents()
+    {
+        var researcher = new BlockingResearcher();
+        var author = new TestAuthor("draft");
+        var reviewer = new TestReviewer("APPROVED");
+        var workflow = new BlogWorkflow(
+            new TestBlogger(),
+            researcher,
+            author,
+            reviewer,
+            NullLogger<BlogWorkflow>.Instance);
+        using var cancellation = new CancellationTokenSource();
+
+        Task<ResearchState> run = workflow.RunAsync(new ResearchState { MainTask = "topic" }, cancellation.Token);
+        await researcher.Started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        cancellation.Cancel();
+
+        try
+        {
+            await run;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        Assert.Equal(0, author.Calls);
+        Assert.Equal(0, reviewer.Calls);
+    }
+
+    [Fact]
+    public async Task RunAsync_FailedExecutorClearsActiveAgentStage()
+    {
+        var author = new TestAuthor("draft");
+        var workflow = new BlogWorkflow(
+            new TestBlogger(),
+            new FailingResearcher(),
+            author,
+            new TestReviewer("APPROVED"),
+            NullLogger<BlogWorkflow>.Instance);
+        var output = new WorkflowOutputCollector();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            workflow.RunAsync(new ResearchState { MainTask = "topic" }, output: output));
+
+        Assert.Contains(output.Updates, update => update.AgentStage == WorkflowAgentStage.Researcher);
+        WorkflowOutputUpdate failure = Assert.Single(output.Updates.Where(update => update.Outcome == WorkflowOutputOutcome.Failure));
+        Assert.Equal(WorkflowAgentStage.None, failure.AgentStage);
+        Assert.Equal(0, author.Calls);
     }
 
     [Fact]
@@ -113,6 +171,30 @@ public sealed class BlogWorkflowTests
             state.ResearchFindings.Add("finding");
             return Task.FromResult(state);
         }
+    }
+
+    private sealed class BlockingResearcher : IResearcherAgent
+    {
+        public TaskCompletionSource Started { get; } = new();
+
+        public Task<string> InvokeAsync(string query, CancellationToken cancellationToken = default) =>
+            Task.FromResult("finding");
+
+        public async Task<ResearchState> ResearchNodeAsync(ResearchState state, CancellationToken cancellationToken = default)
+        {
+            Started.TrySetResult();
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return state;
+        }
+    }
+
+    private sealed class FailingResearcher : IResearcherAgent
+    {
+        public Task<string> InvokeAsync(string query, CancellationToken cancellationToken = default) =>
+            Task.FromResult("finding");
+
+        public Task<ResearchState> ResearchNodeAsync(ResearchState state, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("research failed");
     }
 
     private sealed class TestAuthor(params string?[] drafts) : IAuthorAgent

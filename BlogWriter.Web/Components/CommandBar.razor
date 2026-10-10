@@ -10,6 +10,7 @@
     </div>
     <div class="command-trailing">
         <button type="button" class="range-go" data-command="go" disabled="@(!GoEnabled)" @onclick="Go">Go</button>
+        <button type="button" class="stop-command" data-command="stop" disabled="@(!StopEnabled)" @onclick="Stop">Stop</button>
         <button type="button" data-command="quit" disabled="@(!QuitEnabled)" @onclick="Quit">Quit</button>
         <button type="button" class="help-command" data-command="help" disabled="@(!HelpEnabled)" aria-label="Help" @onclick="Help">?</button>
     </div>
@@ -35,6 +36,9 @@
     public bool GoEnabled { get; set; } = true;
 
     [Parameter]
+    public bool StopEnabled { get; set; }
+
+    [Parameter]
     public bool QuitEnabled { get; set; } = true;
 
     [Parameter]
@@ -48,5 +52,8 @@
 
     [Parameter]
     public EventCallback Go { get; set; }
+
+    [Parameter]
+    public EventCallback Stop { get; set; }
 
 }

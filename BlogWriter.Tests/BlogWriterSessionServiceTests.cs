@@ -125,6 +125,28 @@ public sealed class BlogWriterSessionServiceTests
     }
 
     [Fact]
+    public async Task ListAsync_ForwardsEnrichedSummaryAndCancellationWithoutOtherWork()
+    {
+        BlogSession session = CreateSession("saved draft", "review");
+        session.State.MinWords = 700;
+        session.State.MaxWords = 1350;
+        var store = new RecordingStore { Session = session };
+        var workflow = new StubWorkflow(state => state);
+        var service = new BlogWriterSessionService(workflow, store);
+        using var cancellation = new CancellationTokenSource();
+
+        BlogSessionSummary summary = Assert.Single(await service.ListAsync(cancellation.Token));
+
+        Assert.Equal((700, 1350, "saved draft"), (summary.MinWords, summary.MaxWords, summary.DraftPreview));
+        Assert.Equal(cancellation.Token, store.ListCancellationToken);
+        Assert.Equal(0, store.GetCalls);
+        Assert.Equal(0, store.SaveCalls);
+        Assert.Equal(0, store.CreateCalls);
+        Assert.Equal(0, workflow.CallCount);
+        Assert.Equal("saved draft", session.State.Draft);
+    }
+
+    [Fact]
     public async Task StartAndReviseAsync_ForwardOutputObserverToWorkflow()
     {
         var workflow = new StubWorkflow(state => state);
@@ -170,6 +192,8 @@ public sealed class BlogWriterSessionServiceTests
     {
         public int CreateCalls { get; private set; }
         public int SaveCalls { get; private set; }
+        public int GetCalls { get; private set; }
+        public CancellationToken ListCancellationToken { get; private set; }
         public BlogSession? Session { get; set; }
 
         public Task<BlogSession> CreateAsync(ResearchState state, CancellationToken cancellationToken = default)
@@ -186,13 +210,20 @@ public sealed class BlogWriterSessionServiceTests
             return Task.FromResult(Session);
         }
 
-        public Task<BlogSession?> GetAsync(string sessionId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Session?.Id == sessionId ? Session : null);
+        public Task<BlogSession?> GetAsync(string sessionId, CancellationToken cancellationToken = default)
+        {
+            GetCalls++;
+            return Task.FromResult(Session?.Id == sessionId ? Session : null);
+        }
 
-        public Task<IReadOnlyList<BlogSessionSummary>> ListAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<BlogSessionSummary>>(Session is null
+        public Task<IReadOnlyList<BlogSessionSummary>> ListAsync(CancellationToken cancellationToken = default)
+        {
+            ListCancellationToken = cancellationToken;
+            return Task.FromResult<IReadOnlyList<BlogSessionSummary>>(Session is null
                 ? []
-                : [new(Session.Id, Session.State.MainTask, Session.CreatedAt, Session.UpdatedAt)]);
+                : [BlogSessionSummary.Create(Session.Id, Session.State.MainTask, Session.CreatedAt,
+                    Session.UpdatedAt, Session.State.MinWords, Session.State.MaxWords, Session.State.Draft)]);
+        }
 
         public Task SaveAsync(BlogSession session, CancellationToken cancellationToken = default)
         {

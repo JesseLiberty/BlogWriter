@@ -7,10 +7,20 @@
                 disabled="@(!SelectionEnabled)"
                 @onclick="() => Selected.InvokeAsync(session)">
             <span class="session-number">[@(index + 1)]</span>
-            <div>
+            <span class="session-details">
                 <strong>@session.MainTask</strong>
-                <time datetime="@session.UpdatedAt.ToString("O")">Updated @session.UpdatedAt.ToString("u")</time>
-            </div>
+                <span class="session-metadata">
+                    <time datetime="@session.UpdatedAt.ToString("O")">Updated @session.UpdatedAt.ToString("u")</time>
+                    <span class="session-word-limits">
+                        <span>Min words: @session.MinWords</span>
+                        <span>Max words: @session.MaxWords</span>
+                    </span>
+                </span>
+                <span class="session-preview">
+                    <span class="session-preview-label">Draft preview</span>
+                    <span class="session-preview-text">@(string.IsNullOrEmpty(session.DraftPreview) ? "No draft yet" : session.DraftPreview)@(session.IsDraftTruncated ? "..." : "")</span>
+                </span>
+            </span>
         </button>
     }
 </div>
