@@ -7,7 +7,7 @@ Represents the current Go or Revise operation in the browser workspace.
 | Attribute | Type | Meaning |
 | --- | --- | --- |
 | `IsProcessing` | Boolean | An operation task is active. It remains true while cancellation is pending and through the 10-second status transition. |
-| `ActiveAgentStage` | Nullable stage | The current workflow executor stage, derived from lifecycle events. Stop eligibility is limited to Researcher, Author, and Reviewer. |
+| `ActiveAgentStage` | Stage | The current workflow executor stage, derived from lifecycle events; `None` represents no active stage. Stop eligibility is limited to Researcher, Author, and Reviewer. |
 | `IsStopping` | Boolean | Stop was accepted and cancellation is being awaited. It disables Stop and all other command buttons. |
 | `CurrentStatus` | Nullable text | Existing live status line. It shows `stopping`, then `Cancellation failed` if the operation remains active after 10 seconds. |
 | `OperationVersion` | Integer | Existing monotonically increasing generation used to ignore output from superseded work. |
