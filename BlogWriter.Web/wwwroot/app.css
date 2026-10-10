@@ -187,7 +187,7 @@ button.session-entry:disabled { opacity: .65; cursor: wait; }
 .command-bar button[data-command="list"], .command-bar button[data-command="help"], .command-bar button[data-command="go"] { border-color: var(--forest-dark); background: var(--forest); color: white; }
 .command-bar button[data-command="list"]:hover:not(:disabled), .command-bar button[data-command="help"]:hover:not(:disabled), .command-bar button[data-command="go"]:hover:not(:disabled) { background: var(--forest-dark); }
 .command-bar button[data-command="list"]:active:not(:disabled), .command-bar button[data-command="help"]:active:not(:disabled), .command-bar button[data-command="go"]:active:not(:disabled) { background: var(--forest-deep); }
-.command-bar button[data-command="stop"]:not(:disabled) { border-color: darkred; background: red; color: yellow; }
+.command-bar button[data-command="stop"]:not(:disabled) { border-color: darkred; background: #c00; color: yellow; }
 .command-bar button[data-command="stop"]:hover:not(:disabled) { background: #c00; color: yellow; }
 .command-bar button[data-command="stop"]:active:not(:disabled) { background: darkred; color: yellow; }
 .command-bar button:disabled,

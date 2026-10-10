@@ -150,7 +150,7 @@ public sealed class WorkspaceBrowserTests : BunitContext
         Assert.Contains("overflow: auto", css);
         Assert.Contains("grid-template-columns: repeat(6, minmax(0, 1fr))", css);
         Assert.Contains("button[data-command=\"stop\"]:not(:disabled)", css);
-        Assert.Contains("background: red;", css);
+        Assert.Contains("background: #c00;", css);
         Assert.Contains("color: yellow;", css);
     }
 
