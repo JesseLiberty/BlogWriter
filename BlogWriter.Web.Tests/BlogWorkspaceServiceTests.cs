@@ -603,11 +603,16 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     {
         BlogSessionSummary first = CreateSummary("same topic") with
         {
-            MinWords = 700, MaxWords = 1350, DraftPreview = "saved first draft", IsDraftTruncated = true,
+            MinWords = 700,
+            MaxWords = 1350,
+            DraftPreview = "saved first draft",
+            IsDraftTruncated = true,
         };
         BlogSessionSummary second = CreateSummary("same topic") with
         {
-            MinWords = 400, MaxWords = 400, DraftPreview = "saved second draft",
+            MinWords = 400,
+            MaxWords = 400,
+            DraftPreview = "saved second draft",
         };
         var sessions = new StubSessionService { Summaries = [first, second] };
         var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));

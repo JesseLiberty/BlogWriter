@@ -15,12 +15,17 @@ public class FileBlogSessionStoreTests
             var store = new FileBlogSessionStore(directory);
             BlogSession first = await store.CreateAsync(new ResearchState
             {
-                MainTask = "same topic", MinWords = 700, MaxWords = 1350,
+                MainTask = "same topic",
+                MinWords = 700,
+                MaxWords = 1350,
                 Draft = string.Join(" ", Enumerable.Range(1, 51).Select(number => $"word{number}")),
             });
             BlogSession second = await store.CreateAsync(new ResearchState
             {
-                MainTask = "same topic", MinWords = 400, MaxWords = 400, Draft = "short draft",
+                MainTask = "same topic",
+                MinWords = 400,
+                MaxWords = 400,
+                Draft = "short draft",
             });
             string path = Path.Combine(directory, $"{first.Id}.json");
             string saved = await File.ReadAllTextAsync(path);

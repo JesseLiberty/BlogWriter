@@ -24,8 +24,11 @@ public sealed class CosmosBlogSessionStoreTests
         string draft = string.Join("\t", Enumerable.Range(1, 51).Select(number => $"word{number}"));
         var row = new Dictionary<string, object?>
         {
-            ["Id"] = "first", ["MainTask"] = "topic", ["Draft"] = draft,
-            ["CreatedAt"] = "2026-10-01T12:00:00Z", ["UpdatedAt"] = "2026-10-02T12:00:00Z",
+            ["Id"] = "first",
+            ["MainTask"] = "topic",
+            ["Draft"] = draft,
+            ["CreatedAt"] = "2026-10-01T12:00:00Z",
+            ["UpdatedAt"] = "2026-10-02T12:00:00Z",
         };
         if (min.HasValue) row["MinWords"] = min.Value;
         if (max.HasValue) row["MaxWords"] = max.Value;

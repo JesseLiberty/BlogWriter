@@ -16,11 +16,17 @@ public class BlogSessionStoreOwnershipTests
             var secondOwnerStore = new FileBlogSessionStore(directory, "owner-two");
             BlogSession firstOwnerSession = await firstOwnerStore.CreateAsync(new ResearchState
             {
-                MainTask = "first", MinWords = 700, MaxWords = 1350, Draft = "first owner draft",
+                MainTask = "first",
+                MinWords = 700,
+                MaxWords = 1350,
+                Draft = "first owner draft",
             });
             await secondOwnerStore.CreateAsync(new ResearchState
             {
-                MainTask = "second", MinWords = 400, MaxWords = 400, Draft = "private second draft",
+                MainTask = "second",
+                MinWords = 400,
+                MaxWords = 400,
+                Draft = "private second draft",
             });
 
             Assert.NotNull(await firstOwnerStore.GetAsync(firstOwnerSession.Id));
@@ -51,12 +57,18 @@ public class BlogSessionStoreOwnershipTests
             var local = new FileBlogSessionStore(directory);
             BlogSession legacy = await local.CreateAsync(new ResearchState
             {
-                MainTask = "legacy", MinWords = 600, MaxWords = 900, Draft = "local legacy draft",
+                MainTask = "legacy",
+                MinWords = 600,
+                MaxWords = 900,
+                Draft = "local legacy draft",
             });
             var ownerless = new BlogSession
             {
-                Id = legacy.Id, OwnerId = "", CreatedAt = legacy.CreatedAt,
-                UpdatedAt = legacy.UpdatedAt, State = legacy.State,
+                Id = legacy.Id,
+                OwnerId = "",
+                CreatedAt = legacy.CreatedAt,
+                UpdatedAt = legacy.UpdatedAt,
+                State = legacy.State,
             };
             await local.SaveAsync(ownerless);
             string path = Path.Combine(directory, $"{legacy.Id}.json");
