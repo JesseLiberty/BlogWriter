@@ -32,4 +32,14 @@ public sealed class WordRangeInputTests : BunitContext
         Assert.Contains("min-words-error", cut.Find("#min-words").GetAttribute("aria-describedby"));
         Assert.Equal("Min must be a positive whole number.", cut.Find("#min-words-error").TextContent.Trim());
     }
+
+    [Fact]
+    public void Component_DisablesMinAndMaxWhenDisabled()
+    {
+        IRenderedComponent<WordRangeInput> cut = Render<WordRangeInput>(parameters => parameters
+            .Add(component => component.Disabled, true));
+
+        Assert.True(cut.Find("#min-words").HasAttribute("disabled"));
+        Assert.True(cut.Find("#max-words").HasAttribute("disabled"));
+    }
 }

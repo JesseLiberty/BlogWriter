@@ -10,6 +10,7 @@
                value="@MinValue"
                disabled="@Disabled"
                @oninput="args => MinValueChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)"
+               disabled="@Disabled"
                aria-invalid="@(MinError is null ? "false" : "true")"
                aria-describedby="@(MinError is null ? "min-words-help" : "min-words-help min-words-error")" />
         <span id="min-words-help" class="sr-only">Minimum target word count. Positive whole numbers only.</span>
@@ -30,6 +31,7 @@
                value="@MaxValue"
                disabled="@Disabled"
                @oninput="args => MaxValueChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)"
+               disabled="@Disabled"
                aria-invalid="@(MaxError is null ? "false" : "true")"
                aria-describedby="@(MaxError is null ? "max-words-help" : "max-words-help max-words-error")" />
         <span id="max-words-help" class="sr-only">Maximum target word count. Must be at least Min.</span>
