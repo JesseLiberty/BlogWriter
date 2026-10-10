@@ -128,7 +128,10 @@ public sealed class BlogWorkspaceService : IDisposable
         _activeOperation = null;
         _operationCancellation = null;
         cancellation.Dispose();
-        ClearWorkspace(WorkspaceMode.New);
+        if (State.Mode != WorkspaceMode.Ended)
+        {
+            ClearWorkspace(WorkspaceMode.New);
+        }
     }
 
     public void UpdateMinWords(string value)
