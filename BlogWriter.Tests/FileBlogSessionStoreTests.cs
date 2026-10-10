@@ -1,10 +1,95 @@
 using BlogWriter;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace BlogWriter.Tests;
 
 public class FileBlogSessionStoreTests
 {
+    [Fact]
+    public async Task ListAsync_ReflectsSavedDetailsWithoutChangingDocuments()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"BlogWriterTests-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new FileBlogSessionStore(directory);
+            BlogSession first = await store.CreateAsync(new ResearchState
+            {
+                MainTask = "same topic",
+                MinWords = 700,
+                MaxWords = 1350,
+                Draft = string.Join(" ", Enumerable.Range(1, 51).Select(number => $"word{number}")),
+            });
+            BlogSession second = await store.CreateAsync(new ResearchState
+            {
+                MainTask = "same topic",
+                MinWords = 400,
+                MaxWords = 400,
+                Draft = "short draft",
+            });
+            string path = Path.Combine(directory, $"{first.Id}.json");
+            string saved = await File.ReadAllTextAsync(path);
+
+            IReadOnlyList<BlogSessionSummary> listed = await store.ListAsync();
+
+            Assert.Equal(saved, await File.ReadAllTextAsync(path));
+            Assert.Equal(BlogSessionSummary.Create(first.Id, first.State.MainTask, first.CreatedAt,
+                first.UpdatedAt, 700, 1350, first.State.Draft), listed.Single(summary => summary.Id == first.Id));
+            Assert.Equal("short draft", listed.Single(summary => summary.Id == second.Id).DraftPreview);
+
+            first.State.MinWords = 800;
+            first.State.MaxWords = 1400;
+            first.State.Draft = "new saved draft";
+            await store.SaveAsync(first);
+            listed = await store.ListAsync();
+            BlogSessionSummary refreshed = listed.Single(summary => summary.Id == first.Id);
+            Assert.Equal((800, 1400, "new saved draft"), (refreshed.MinWords, refreshed.MaxWords, refreshed.DraftPreview));
+            Assert.False(refreshed.IsDraftTruncated);
+            Assert.Equal("short draft", listed.Single(summary => summary.Id == second.Id).DraftPreview);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(null, null, 1000, 2000)]
+    [InlineData(700, null, 700, 2000)]
+    [InlineData(null, 1500, 1000, 1500)]
+    [InlineData(0, 1500, 1000, 2000)]
+    [InlineData(1800, 1200, 1000, 2000)]
+    public async Task ListAsync_LegacyAndInvalidBoundsMatchRestore(int? min, int? max, int expectedMin, int expectedMax)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"BlogWriterTests-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new FileBlogSessionStore(directory);
+            BlogSession session = await store.CreateAsync(new ResearchState { MainTask = "legacy" });
+            string path = Path.Combine(directory, $"{session.Id}.json");
+            JsonObject document = JsonNode.Parse(await File.ReadAllTextAsync(path))!.AsObject();
+            JsonObject state = document["State"]!.AsObject();
+            state.Remove("MinWords");
+            state.Remove("MaxWords");
+            if (min.HasValue) state["MinWords"] = min.Value;
+            if (max.HasValue) state["MaxWords"] = max.Value;
+            state["Draft"] = null;
+            string saved = document.ToJsonString();
+            await File.WriteAllTextAsync(path, saved);
+
+            BlogSessionSummary summary = Assert.Single(await store.ListAsync());
+
+            Assert.Equal((expectedMin, expectedMax), (summary.MinWords, summary.MaxWords));
+            Assert.Empty(summary.DraftPreview);
+            Assert.False(summary.IsDraftTruncated);
+            Assert.Equal(saved, await File.ReadAllTextAsync(path));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task CreateAndGetAsync_RoundTripsCompletedWorkflowState()
     {

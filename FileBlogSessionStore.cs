@@ -57,7 +57,9 @@ public sealed class FileBlogSessionStore(string directoryPath, string ownerId = 
             BlogSession? session = await JsonSerializer.DeserializeAsync<BlogSession>(stream, s_jsonOptions, cancellationToken);
             if (session is not null && (session.OwnerId == _ownerId || (session.OwnerId.Length == 0 && _ownerId == "local")))
             {
-                sessions.Add(new BlogSessionSummary(session.Id, session.State.MainTask, session.CreatedAt, session.UpdatedAt));
+                sessions.Add(BlogSessionSummary.Create(
+                    session.Id, session.State.MainTask, session.CreatedAt, session.UpdatedAt,
+                    session.State.MinWords, session.State.MaxWords, session.State.Draft));
             }
         }
 

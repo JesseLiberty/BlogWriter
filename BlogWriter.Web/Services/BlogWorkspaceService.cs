@@ -92,6 +92,48 @@ public sealed class BlogWorkspaceService : IDisposable
                 output));
     }
 
+    public async Task StopAsync()
+    {
+        if (!State.IsStopCommandEnabled || _activeOperation is null || _operationCancellation is null)
+        {
+            return;
+        }
+
+        Task activeOperation = _activeOperation;
+        CancellationTokenSource cancellation = _operationCancellation;
+        ++_operationVersion;
+        State.IsStopping = true;
+        State.ActiveAgentStage = WorkflowAgentStage.None;
+        State.ValidationMessage = null;
+        State.AppendLog("stopping", WorkflowOutputOutcome.Cancellation);
+        NotifyChanged();
+
+        cancellation.Cancel();
+        Task timeout = Task.Delay(_cancellationTimeout);
+        Task completed = await Task.WhenAny(activeOperation, timeout);
+        if (completed != activeOperation && !activeOperation.IsCompleted)
+        {
+            State.AppendLog("Cancellation failed", WorkflowOutputOutcome.Failure);
+            NotifyChanged();
+        }
+
+        try
+        {
+            await activeOperation;
+        }
+        catch
+        {
+        }
+
+        _activeOperation = null;
+        _operationCancellation = null;
+        cancellation.Dispose();
+        if (State.Mode != WorkspaceMode.Ended)
+        {
+            ClearWorkspace(WorkspaceMode.New);
+        }
+    }
+
     public void UpdateMinWords(string value)
     {
         State.MinWordsInput = value;
@@ -285,6 +327,8 @@ public sealed class BlogWorkspaceService : IDisposable
         var cancellation = new CancellationTokenSource();
         _operationCancellation = cancellation;
         State.IsProcessing = true;
+        State.ActiveAgentStage = WorkflowAgentStage.None;
+        State.IsStopping = false;
         State.ValidationMessage = null;
         State.Draft = "";
         State.StatusMessage = "Writing in progress...";
@@ -446,6 +490,8 @@ public sealed class BlogWorkspaceService : IDisposable
         State.IsRestoredPending = false;
         State.IsListing = false;
         State.IsProcessing = false;
+        State.ActiveAgentStage = WorkflowAgentStage.None;
+        State.IsStopping = false;
         State.StatusMessage = null;
         State.ValidationMessage = null;
         State.CurrentStatus = null;
@@ -473,6 +519,7 @@ public sealed class BlogWorkspaceService : IDisposable
         }
         else
         {
+            State.ActiveAgentStage = update.AgentStage;
             State.AppendLog(update.Message, update.Outcome);
         }
 

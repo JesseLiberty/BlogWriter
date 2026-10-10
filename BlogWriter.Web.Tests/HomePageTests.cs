@@ -11,7 +11,7 @@ public sealed class HomePageTests : BunitContext
     public HomePageTests() => JSInterop.Mode = JSRuntimeMode.Loose;
 
     [Fact]
-    public void Home_RendersWritingWorkspaceAndFiveCommands()
+    public void Home_RendersWritingWorkspaceAndSixCommands()
     {
         BlogWorkspaceService workspace = RegisterWorkspace();
 
@@ -21,7 +21,7 @@ public sealed class HomePageTests : BunitContext
         Assert.NotNull(cut.Find("#revision-prompt"));
         Assert.NotNull(cut.Find("[aria-labelledby='draft-heading']"));
         Assert.NotNull(cut.Find("[aria-labelledby='review-heading']"));
-        Assert.Equal(["New", "List", "Go", "Quit", "?"],
+        Assert.Equal(["New", "List", "Go", "Stop", "Quit", "?"],
             cut.FindAll(".command-bar button").Select(button => button.TextContent.Trim()).ToArray());
         Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
         Assert.False(workspace.State.IsSessionSelectionEnabled);
@@ -137,7 +137,10 @@ public sealed class HomePageTests : BunitContext
             Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
             Assert.False(cut.Find("#min-words").HasAttribute("disabled"));
             Assert.False(cut.Find("#max-words").HasAttribute("disabled"));
-            Assert.All(cut.FindAll(".command-bar button"), button => Assert.False(button.HasAttribute("disabled")));
+            Assert.All(
+                cut.FindAll(".command-bar button").Where(button => button.GetAttribute("data-command") != "stop"),
+                button => Assert.False(button.HasAttribute("disabled")));
+            Assert.True(cut.Find("button[data-command='stop']").HasAttribute("disabled"));
         });
     }
 
@@ -233,6 +236,7 @@ public sealed class HomePageTests : BunitContext
         Assert.True(cut.Find("button[data-command='new']").HasAttribute("disabled") is false);
         Assert.True(cut.Find("button[data-command='list']").HasAttribute("disabled"));
         Assert.True(cut.Find("button[data-command='go']").HasAttribute("disabled"));
+        Assert.True(cut.Find("button[data-command='stop']").HasAttribute("disabled"));
         Assert.True(cut.Find("button[data-command='quit']").HasAttribute("disabled"));
         Assert.True(cut.Find("button[data-command='help']").HasAttribute("disabled"));
 

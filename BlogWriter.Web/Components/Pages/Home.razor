@@ -67,9 +67,11 @@
                         NewEnabled="@Workspace.State.IsNewCommandEnabled"
                         ListEnabled="@Workspace.State.IsListCommandEnabled"
                         GoEnabled="@Workspace.State.IsGoCommandEnabled"
+                        StopEnabled="@Workspace.State.IsStopCommandEnabled"
                         QuitEnabled="@Workspace.State.IsQuitCommandEnabled"
                         HelpEnabled="@Workspace.State.IsHelpCommandEnabled"
                         Go="Workspace.SubmitAsync"
+                        Stop="Workspace.StopAsync"
                         Quit="() => RequestTransitionAsync(PendingAction.Quit)"
                         Help="ShowHelp">
                 <ChildContent>

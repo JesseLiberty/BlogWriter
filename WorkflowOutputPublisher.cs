@@ -12,9 +12,12 @@ internal sealed class WorkflowOutputPublisher
         _operationVersion = operationVersion;
     }
 
-    public void PublishLifecycle(WorkflowOutputOutcome outcome, string message)
+    public void PublishLifecycle(
+        WorkflowOutputOutcome outcome,
+        string message,
+        WorkflowAgentStage agentStage = WorkflowAgentStage.None)
     {
-        Publish(WorkflowOutputKind.Lifecycle, outcome, message, revisionNumber: null);
+        Publish(WorkflowOutputKind.Lifecycle, outcome, message, revisionNumber: null, agentStage);
     }
 
     public void PublishReviewer(string message, int revisionNumber)
@@ -26,7 +29,8 @@ internal sealed class WorkflowOutputPublisher
         WorkflowOutputKind kind,
         WorkflowOutputOutcome outcome,
         string message,
-        int? revisionNumber)
+        int? revisionNumber,
+        WorkflowAgentStage agentStage = WorkflowAgentStage.None)
     {
         if (_output is null || string.IsNullOrWhiteSpace(message))
         {
@@ -41,7 +45,8 @@ internal sealed class WorkflowOutputPublisher
             _operationVersion,
             sequence,
             $"workflow-{_operationVersion}-{sequence}",
-            revisionNumber);
+            revisionNumber,
+            agentStage);
 
         try
         {

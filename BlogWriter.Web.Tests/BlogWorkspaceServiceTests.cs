@@ -599,6 +599,40 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ListAsync_RefreshesSavedDetailsWithoutBorrowingWorkspaceInputs()
+    {
+        BlogSessionSummary first = CreateSummary("same topic") with
+        {
+            MinWords = 700,
+            MaxWords = 1350,
+            DraftPreview = "saved first draft",
+            IsDraftTruncated = true,
+        };
+        BlogSessionSummary second = CreateSummary("same topic") with
+        {
+            MinWords = 400,
+            MaxWords = 400,
+            DraftPreview = "saved second draft",
+        };
+        var sessions = new StubSessionService { Summaries = [first, second] };
+        var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
+        await workspace.ListAsync(false);
+        Assert.Equal(new[] { first, second }, workspace.State.DisplayedSessions);
+
+        BlogSessionSummary refreshed = first with { MinWords = 800, DraftPreview = "new saved draft" };
+        sessions.Summaries = [refreshed, second];
+        workspace.State.InitialPrompt = "unsaved topic";
+        workspace.State.Draft = "unsaved draft";
+        workspace.UpdateMinWords("123");
+        await workspace.ListAsync(true);
+
+        Assert.Equal(new[] { refreshed, second }, workspace.State.DisplayedSessions);
+        Assert.Equal(0, sessions.LoadCalls);
+        Assert.Equal(0, sessions.StartCalls);
+        Assert.Equal(0, sessions.RevisionCalls);
+    }
+
+    [Fact]
     public async Task RevisionInput_RemainsDisabledWhenWorkspaceEnds()
     {
         var workspace = new BlogWorkspaceService(new StubSessionService(), TimeSpan.FromMilliseconds(25));
@@ -685,6 +719,103 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         Assert.Equal(WorkspaceMode.New, workspace.State.Mode);
         Assert.Empty(workspace.State.Draft);
     }
+
+    [Fact]
+    public async Task StopAsync_CancelsGoAndResetsOnlyAfterOperationEnds()
+    {
+        var sessions = new StubSessionService { PendingStart = new TaskCompletionSource<BlogSession>() };
+        var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromSeconds(1));
+        workspace.State.InitialPrompt = "topic";
+        Task submit = workspace.SubmitInitialAsync();
+        await sessions.Started.Task;
+
+        sessions.LastOutput!.Report(CreateStageUpdate(WorkflowAgentStage.Researcher, "researcher-started"));
+        Assert.True(workspace.State.IsStopCommandEnabled);
+
+        Task stop = workspace.StopAsync();
+
+        Assert.True(sessions.LastCancellationToken.IsCancellationRequested);
+        Assert.True(workspace.State.IsProcessing);
+        Assert.True(workspace.State.IsStopping);
+        Assert.Equal("stopping", workspace.State.CurrentStatus);
+        Assert.All(GetCommandEnabledStates(workspace.State), Assert.False);
+        Assert.Equal("topic", workspace.State.InitialPrompt);
+
+        sessions.PendingStart.SetResult(CreateSession("late draft"));
+        await Task.WhenAll(submit, stop);
+
+        Assert.Equal(WorkspaceMode.New, workspace.State.Mode);
+        Assert.Empty(workspace.State.InitialPrompt);
+        Assert.Empty(workspace.State.RevisionPrompt);
+        Assert.Empty(workspace.State.Draft);
+        Assert.Empty(workspace.State.Review);
+        Assert.Empty(workspace.State.WorkflowLog);
+        Assert.Null(workspace.State.CurrentStatus);
+        Assert.False(workspace.State.IsProcessing);
+        Assert.False(workspace.State.IsStopping);
+        Assert.False(workspace.State.IsStopCommandEnabled);
+
+        sessions.LastOutput.Report(CreateStageUpdate(WorkflowAgentStage.Author, "late-author-stage"));
+
+        Assert.Empty(workspace.State.Draft);
+        Assert.Null(workspace.State.CurrentStatus);
+    }
+
+    [Fact]
+    public async Task StopAsync_ReportsTimeoutAndKeepsRevisionLockedUntilItEnds()
+    {
+        var sessions = new StubSessionService();
+        var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
+        workspace.State.InitialPrompt = "topic";
+        await workspace.SubmitInitialAsync();
+        workspace.State.RevisionPrompt = "revise the ending";
+        sessions.PendingRevision = new TaskCompletionSource<BlogSession>();
+        Task revise = workspace.SubmitRevisionAsync();
+        await sessions.RevisionStarted.Task;
+
+        sessions.LastOutput!.Report(CreateStageUpdate(WorkflowAgentStage.Reviewer, "reviewer-started"));
+        Assert.True(workspace.State.IsStopCommandEnabled);
+
+        Task stop = workspace.StopAsync();
+        await Task.Delay(100);
+
+        Assert.True(sessions.LastCancellationToken.IsCancellationRequested);
+        Assert.True(workspace.State.IsProcessing);
+        Assert.True(workspace.State.IsStopping);
+        Assert.Equal("Cancellation failed", workspace.State.CurrentStatus);
+        Assert.All(GetCommandEnabledStates(workspace.State), Assert.False);
+        Assert.Equal(WorkspaceMode.Draft, workspace.State.Mode);
+
+        sessions.PendingRevision.SetResult(CreateSession("late revised draft"));
+        await Task.WhenAll(revise, stop);
+
+        Assert.Equal(WorkspaceMode.New, workspace.State.Mode);
+        Assert.Empty(workspace.State.Draft);
+        Assert.Empty(workspace.State.Review);
+        Assert.Null(workspace.State.CurrentStatus);
+        Assert.False(workspace.State.IsProcessing);
+        Assert.False(workspace.State.IsStopping);
+    }
+
+    private static WorkflowOutputUpdate CreateStageUpdate(WorkflowAgentStage stage, string updateKey) =>
+        WorkflowOutputUpdate.Create(
+            WorkflowOutputKind.Lifecycle,
+            WorkflowOutputOutcome.Progress,
+            $"{stage} started.",
+            operationVersion: 1,
+            sequence: 2,
+            updateKey: updateKey,
+            agentStage: stage);
+
+    private static bool[] GetCommandEnabledStates(BlogWorkspaceState state) =>
+    [
+        state.IsNewCommandEnabled,
+        state.IsListCommandEnabled,
+        state.IsGoCommandEnabled,
+        state.IsQuitCommandEnabled,
+        state.IsHelpCommandEnabled,
+        state.IsStopCommandEnabled,
+    ];
 
     [Fact]
     public async Task SubmitInitialAsync_RejectsDuplicateWhileOperationIsActive()
@@ -826,16 +957,20 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         public IReadOnlyList<BlogSessionSummary> Summaries { get; set; } = [];
         public BlogSession? SessionToLoad { get; init; }
         public TaskCompletionSource<BlogSession>? PendingStart { get; init; }
+        public TaskCompletionSource<BlogSession>? PendingRevision { get; set; }
         public TaskCompletionSource<IReadOnlyList<BlogSessionSummary>>? PendingList { get; init; }
         public TaskCompletionSource Started { get; } = new();
+        public TaskCompletionSource RevisionStarted { get; } = new();
         public TaskCompletionSource ListStarted { get; } = new();
         public IProgress<WorkflowOutputUpdate>? LastOutput { get; private set; }
+        public CancellationToken LastCancellationToken { get; private set; }
 
         public Task<BlogSession> StartAsync(string prompt, int minWords = ResearchState.DefaultMinWords, int maxWords = ResearchState.DefaultMaxWords, CancellationToken cancellationToken = default, IProgress<WorkflowOutputUpdate>? output = null)
         {
             StartCalls++;
             LastStartPrompt = prompt;
             LastOutput = output;
+            LastCancellationToken = cancellationToken;
             output?.Report(WorkflowOutputUpdate.Create(
                 WorkflowOutputKind.ReviewerFeedback,
                 WorkflowOutputOutcome.Review,
@@ -858,6 +993,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         {
             RevisionCalls++;
             LastOutput = output;
+            LastCancellationToken = cancellationToken;
             output?.Report(WorkflowOutputUpdate.Create(
                 WorkflowOutputKind.ReviewerFeedback,
                 WorkflowOutputOutcome.Review,
@@ -866,6 +1002,12 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
                 sequence: 1,
                 updateKey: "revision-review"));
             LastRevisionRange = new WordRange(minWords, maxWords);
+            RevisionStarted.TrySetResult();
+            if (PendingRevision is not null)
+            {
+                return PendingRevision.Task;
+            }
+
             return Task.FromResult(new BlogSession
             {
                 Id = session.Id,

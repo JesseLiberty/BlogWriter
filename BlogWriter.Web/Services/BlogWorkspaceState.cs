@@ -44,6 +44,8 @@ public sealed class BlogWorkspaceState
     public BlogSession? ActiveSession { get; internal set; }
     public IReadOnlyList<BlogSessionSummary> DisplayedSessions { get; internal set; } = [];
     public bool IsProcessing { get; internal set; }
+    public WorkflowAgentStage ActiveAgentStage { get; internal set; } = WorkflowAgentStage.None;
+    public bool IsStopping { get; internal set; }
     public bool IsListing { get; internal set; }
     public bool IsSelecting { get; internal set; }
     internal bool IsRestoredPending { get; set; }
@@ -95,11 +97,16 @@ public sealed class BlogWorkspaceState
     public bool HasDraft => !string.IsNullOrWhiteSpace(Draft);
     public bool IsWordRangeEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
 
-    public bool IsNewCommandEnabled => !IsProcessing && !IsSelecting && Mode != WorkspaceMode.Ended;
+    public bool IsNewCommandEnabled => !IsProcessing && !IsSelecting && !IsStopping && Mode != WorkspaceMode.Ended;
     public bool IsListCommandEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
     public bool IsGoCommandEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
     public bool IsQuitCommandEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
     public bool IsHelpCommandEnabled => !IsBusy && (Mode is WorkspaceMode.New or WorkspaceMode.Draft);
+    public bool IsStopCommandEnabled =>
+        IsProcessing &&
+        !IsStopping &&
+        Mode != WorkspaceMode.Ended &&
+        ActiveAgentStage is WorkflowAgentStage.Researcher or WorkflowAgentStage.Author or WorkflowAgentStage.Reviewer;
 
     /// <summary>
     /// Latched once a draft exists. A restored saved session remains an initial
@@ -121,7 +128,7 @@ public sealed class BlogWorkspaceState
         !IsRevisionRequested &&
         (Mode == WorkspaceMode.New || IsRestoredPending);
 
-    private bool IsBusy => IsProcessing || IsListing || IsSelecting;
+    private bool IsBusy => IsProcessing || IsStopping || IsListing || IsSelecting;
 
     /// <summary>
     /// Prompt text as last accepted by a completed writing operation. Prompts keep their
