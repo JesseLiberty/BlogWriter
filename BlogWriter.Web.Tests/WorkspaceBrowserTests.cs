@@ -1,13 +1,35 @@
 using Bunit;
 using BlogWriter.Web.Components;
 using BlogWriter.Web.Components.Pages;
+using BlogWriter.Web.Components.Layout;
 using BlogWriter.Web.Services;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BlogWriter.Web.Tests;
 
 public sealed class WorkspaceBrowserTests : BunitContext
 {
+    [Fact]
+    public async Task Header_UsesFixedDisplayCopyWithoutChangingIdentityOrSignOut()
+    {
+        var authorization = this.AddAuthorization();
+        authorization.SetAuthorized("jesseliberty@gmail.com");
+        var cut = Render<MainLayout>();
+
+        Assert.Equal("Jesse Liberty", cut.Find(".display-name").TextContent);
+        Assert.Equal("Senior AI Engineer", cut.Find(".user-role").TextContent);
+        Assert.Equal("MicrosoftIdentity/Account/SignOut", cut.Find("a.sign-out").GetAttribute("href"));
+        Assert.Equal("Sign out", cut.Find("a.sign-out").TextContent);
+        Assert.DoesNotContain("jesseliberty@gmail.com", cut.Markup);
+        AuthenticationState state = await Services.GetRequiredService<AuthenticationStateProvider>().GetAuthenticationStateAsync();
+        Assert.Equal("jesseliberty@gmail.com", state.User.Identity!.Name);
+
+        authorization.SetNotAuthorized();
+        var signedOut = Render<MainLayout>();
+        Assert.Empty(signedOut.FindAll(".display-name, .user-role, a.sign-out"));
+    }
+
     [Fact]
     public void ListButton_ShowsTenSavedSessionsAndRefreshesOnlyChangedDetails()
     {
@@ -176,11 +198,12 @@ public sealed class WorkspaceBrowserTests : BunitContext
             Assert.Equal(0, sessions.StartCalls);
             Assert.Equal(0, sessions.RevisionCalls);
             Assert.Equal("saved topic", cut.Find("#initial-prompt").GetAttribute("value"));
-            Assert.Equal("tighten the ending", cut.Find("#revision-prompt").GetAttribute("value"));
+            Assert.Equal("tighten the ending", workspace.State.RevisionPrompt);
+            Assert.Empty(cut.FindAll("#revision-prompt"));
             Assert.Equal("700", cut.Find("#min-words").GetAttribute("value"));
             Assert.Equal("1350", cut.Find("#max-words").GetAttribute("value"));
             Assert.False(cut.Find("#initial-prompt").HasAttribute("disabled"));
-            Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
+            Assert.False(workspace.State.IsRevisionInputEnabled);
             Assert.False(cut.Find("#min-words").HasAttribute("disabled"));
             Assert.False(cut.Find("#max-words").HasAttribute("disabled"));
             Assert.Empty(workspace.State.Draft);
@@ -276,7 +299,7 @@ public sealed class WorkspaceBrowserTests : BunitContext
     }
 
     [Fact]
-    public async Task StopButton_CancelsActiveRevision()
+    public async Task CompletedWorkspace_CannotStartRevisionThroughGoOrDirectEntry()
     {
         var sessions = new BrowserSessionService();
         var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromSeconds(1));
@@ -286,29 +309,21 @@ public sealed class WorkspaceBrowserTests : BunitContext
         cut.Find("#initial-prompt").Input("topic");
         cut.Find("button[data-command='go']").Click();
         cut.WaitForAssertion(() => Assert.Equal(1, sessions.StartCalls));
-        cut.Find("#revision-prompt").Input("tighten the ending");
-        sessions.PendingRevision = new TaskCompletionSource<BlogSession>(TaskCreationOptions.RunContinuationsAsynchronously);
-
+        workspace.State.RevisionPrompt = "tighten the ending";
+        string draft = workspace.State.Draft;
+        string source = System.Text.Json.JsonSerializer.Serialize(sessions.SourceSession);
+        await workspace.SubmitRevisionAsync();
         cut.Find("button[data-command='go']").Click();
-        await sessions.RevisionStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
-        sessions.ReportStage(WorkflowAgentStage.Reviewer);
-        cut.WaitForAssertion(() => Assert.False(cut.Find("button[data-command='stop']").HasAttribute("disabled")));
-
-        cut.Find("button[data-command='stop']").Click();
         cut.WaitForAssertion(() =>
         {
-            Assert.Equal("stopping", workspace.State.CurrentStatus);
-            AssertAllCommandsDisabled(cut);
+            Assert.Equal(WorkspaceMode.Draft, workspace.State.Mode);
+            Assert.Equal(draft, workspace.State.Draft);
+            Assert.Equal(0, sessions.RevisionCalls);
+            Assert.Equal(1, sessions.StartCalls);
+            Assert.True(cut.Find("button[data-command='stop']").HasAttribute("disabled"));
+            Assert.Empty(cut.FindAll("#revision-prompt"));
         });
-        Assert.True(sessions.LastCancellationToken.IsCancellationRequested);
-
-        sessions.PendingRevision.SetResult(ListLauncherTestHelpers.Session("topic", "tighten the ending", "late revision", "late review"));
-        cut.WaitForAssertion(() =>
-        {
-            Assert.Equal(WorkspaceMode.New, workspace.State.Mode);
-            Assert.Empty(workspace.State.Draft);
-            Assert.Empty(workspace.State.Review);
-        });
+        Assert.Equal(source, System.Text.Json.JsonSerializer.Serialize(sessions.SourceSession));
     }
 
     private static void AssertAllCommandsDisabled(IRenderedComponent<Home> cut)

@@ -11,6 +11,17 @@ public sealed class HomePageTests : BunitContext
     public HomePageTests() => JSInterop.Mode = JSRuntimeMode.Loose;
 
     [Fact]
+    public void Home_UsesRequestedHeadingAndUnnumberedDraft()
+    {
+        RegisterWorkspace();
+        var cut = Render<Home>();
+        Assert.Equal("Research. Write. Revise.", cut.Find("h1").TextContent);
+        Assert.DoesNotContain("A researcher and author for blog pages", cut.Markup);
+        Assert.Empty(cut.FindAll(".draft-pane .pane-index"));
+        Assert.Equal("Draft", cut.Find("#draft-heading").TextContent);
+    }
+
+    [Fact]
     public void Home_RendersWritingWorkspaceAndSixCommands()
     {
         BlogWorkspaceService workspace = RegisterWorkspace();
@@ -18,22 +29,23 @@ public sealed class HomePageTests : BunitContext
         IRenderedComponent<Home> cut = Render<Home>();
 
         Assert.NotNull(cut.Find("#initial-prompt"));
-        Assert.NotNull(cut.Find("#revision-prompt"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
         Assert.NotNull(cut.Find("[aria-labelledby='draft-heading']"));
-        Assert.NotNull(cut.Find("[aria-labelledby='review-heading']"));
+        Assert.Empty(cut.FindAll("[aria-labelledby='review-heading']"));
         Assert.Equal(["New", "List", "Go", "Stop", "Quit", "?"],
             cut.FindAll(".command-bar button").Select(button => button.TextContent.Trim()).ToArray());
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Single(cut.FindAll("textarea"));
         Assert.False(workspace.State.IsSessionSelectionEnabled);
     }
 
     [Fact]
-    public void Home_PlacesDefaultWordRangeInCommandBar()
+    public void Home_PlacesDefaultWordRangeBesideQuery()
     {
         RegisterWorkspace();
         IRenderedComponent<Home> cut = Render<Home>();
 
-        Assert.NotNull(cut.Find(".command-bar .command-range .word-range-row"));
+        Assert.NotNull(cut.Find(".prompt-strip .word-range-row"));
+        Assert.Empty(cut.FindAll(".command-bar .command-range"));
         Assert.Equal("1000", cut.Find("#min-words").GetAttribute("value"));
         Assert.Equal("2000", cut.Find("#max-words").GetAttribute("value"));
         Assert.NotNull(cut.Find("button[data-command='go']"));
@@ -52,7 +64,7 @@ public sealed class HomePageTests : BunitContext
         {
             Assert.Empty(cut.FindAll("#command-session-number"));
             Assert.Single(cut.FindAll(".session-list button.session-entry"));
-            Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+            Assert.Empty(cut.FindAll("#revision-prompt"));
             Assert.Contains("[1]", cut.Find(".session-list").TextContent);
         });
     }
@@ -134,7 +146,7 @@ public sealed class HomePageTests : BunitContext
         {
             Assert.Equal(WorkspaceMode.New, workspace.State.Mode);
             Assert.False(cut.Find("#initial-prompt").HasAttribute("disabled"));
-            Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+            Assert.Empty(cut.FindAll("#revision-prompt"));
             Assert.False(cut.Find("#min-words").HasAttribute("disabled"));
             Assert.False(cut.Find("#max-words").HasAttribute("disabled"));
             Assert.All(
@@ -156,30 +168,24 @@ public sealed class HomePageTests : BunitContext
 
         Assert.True(workspace.State.HasDraft);
         Assert.True(cut.Find("#initial-prompt").HasAttribute("disabled"));
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
     }
 
     [Fact]
-    public void Home_RevisionWindowTracksQueryNotDraftOrRevisionText()
+    public void Home_RevisionWindowRemainsAbsentWhileEditingQuery()
     {
         BlogWorkspaceService workspace = RegisterWorkspace();
         IRenderedComponent<Home> cut = Render<Home>();
-        var revision = cut.Find("#revision-prompt");
-
-        Assert.True(revision.HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
 
         cut.Find("#initial-prompt").Input("topic");
 
-        Assert.False(revision.HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
         Assert.False(workspace.State.HasDraft);
-
-        revision.Input("revise the introduction");
-
-        Assert.False(revision.HasAttribute("disabled"));
 
         cut.Find("#initial-prompt").Input("  ");
 
-        Assert.True(revision.HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
     }
 
     [Fact]
@@ -195,7 +201,7 @@ public sealed class HomePageTests : BunitContext
         await sessions.Started.Task;
 
         Assert.True(cut.Find("#initial-prompt").HasAttribute("disabled"));
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
         Assert.True(cut.Find("#min-words").HasAttribute("disabled"));
         Assert.True(cut.Find("#max-words").HasAttribute("disabled"));
         Assert.All(cut.FindAll(".command-bar button"), button => Assert.True(button.HasAttribute("disabled")));
@@ -230,7 +236,7 @@ public sealed class HomePageTests : BunitContext
         await sessions.ListStarted.Task;
 
         Assert.True(cut.Find("#initial-prompt").HasAttribute("disabled"));
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
         Assert.True(cut.Find("#min-words").HasAttribute("disabled"));
         Assert.True(cut.Find("#max-words").HasAttribute("disabled"));
         Assert.True(cut.Find("button[data-command='new']").HasAttribute("disabled") is false);
@@ -248,7 +254,7 @@ public sealed class HomePageTests : BunitContext
     }
 
     [Fact]
-    public async Task Home_PopulatedDraftKeepsRevisionEnabledWhileQueryIsPresent()
+    public async Task Home_PopulatedDraftDoesNotOfferOrSubmitRevision()
     {
         BlogWorkspaceService workspace = RegisterWorkspace();
         workspace.State.InitialPrompt = "topic";
@@ -257,15 +263,14 @@ public sealed class HomePageTests : BunitContext
 
         Assert.True(workspace.State.HasDraft);
         Assert.True(cut.Find("#initial-prompt").HasAttribute("disabled"));
-        Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
-
-        cut.Find("#revision-prompt").Input("make it shorter");
-        cut.WaitForAssertion(() => Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled")));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
+        workspace.State.RevisionPrompt = "make it shorter";
+        string draft = workspace.State.Draft;
 
         cut.Find("button[data-command='go']").Click();
-        cut.WaitForAssertion(() => Assert.Contains("revised", workspace.State.Draft));
+        cut.WaitForAssertion(() => Assert.Equal(draft, workspace.State.Draft));
 
-        Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
         Assert.False(cut.Find("button[data-command='go']").HasAttribute("disabled"));
     }
 
@@ -279,7 +284,7 @@ public sealed class HomePageTests : BunitContext
         Assert.False(cut.Find("button[data-command='list']").HasAttribute("disabled"));
         Assert.False(cut.Find("button[data-command='quit']").HasAttribute("disabled"));
         Assert.Empty(cut.FindAll("button[data-command='revise']"));
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
     }
 
     [Fact]
@@ -289,11 +294,11 @@ public sealed class HomePageTests : BunitContext
         IRenderedComponent<Home> cut = Render<Home>();
 
         Assert.Equal("New query", cut.Find("label[for='initial-prompt']").TextContent.Trim());
-        Assert.Equal("Revision request", cut.Find("label[for='revision-prompt']").TextContent.Trim());
+        Assert.Empty(cut.FindAll("label[for='revision-prompt']"));
         Assert.NotNull(cut.Find("nav[aria-label='Workspace commands']"));
         Assert.NotNull(cut.Find("[aria-live='polite']"));
         Assert.NotNull(cut.Find("[aria-labelledby='draft-heading']"));
-        Assert.NotNull(cut.Find("[aria-labelledby='review-heading']"));
+        Assert.Empty(cut.FindAll("[aria-labelledby='review-heading']"));
     }
 
     [Fact]
@@ -352,13 +357,13 @@ public sealed class HomePageTests : BunitContext
             Assert.Empty(workspace.State.Review);
             Assert.Null(workspace.State.ActiveSession);
             Assert.False(cut.Find("#initial-prompt").HasAttribute("disabled"));
-            Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
+            Assert.Empty(cut.FindAll("#revision-prompt"));
             Assert.Empty(cut.FindAll("#command-session-number"));
         });
     }
 
     [Fact]
-    public void Home_DisplaysCompletedDraftAndReviewerNotes()
+    public void Home_DisplaysDraftAndRetainsReviewerNotesInternally()
     {
         BlogWorkspaceService workspace = RegisterWorkspace();
         IRenderedComponent<Home> cut = Render<Home>();
@@ -370,7 +375,8 @@ public sealed class HomePageTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             Assert.Contains("draft", cut.Find("[aria-labelledby='draft-heading']").TextContent);
-            Assert.Contains("review", cut.Find("[aria-labelledby='review-heading']").TextContent);
+            Assert.Empty(cut.FindAll("[aria-labelledby='review-heading']"));
+            Assert.Contains("review", workspace.State.Review);
         });
     }
 
@@ -381,23 +387,23 @@ public sealed class HomePageTests : BunitContext
         workspace.State.InitialPrompt = "topic";
         IRenderedComponent<Home> cut = Render<Home>();
 
-        Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
 
         workspace.State.Draft = "draft";
         cut.Render();
 
-        Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
 
         workspace.State.Draft = "  ";
         cut.Render();
 
-        Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
 
         cut.Find("button[data-command='new']").Click();
         cut.WaitForAssertion(() => Assert.NotNull(cut.Find("[role='dialog']")));
         cut.Find("button[data-confirm='discard']").Click();
 
-        Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+        Assert.Empty(cut.FindAll("#revision-prompt"));
     }
 
     [Fact]
@@ -414,7 +420,7 @@ public sealed class HomePageTests : BunitContext
         {
             Assert.Equal("topic", cut.Find("#initial-prompt").GetAttribute("value"));
             Assert.True(cut.Find("#initial-prompt").HasAttribute("disabled"));
-            Assert.False(cut.Find("#revision-prompt").HasAttribute("disabled"));
+            Assert.Empty(cut.FindAll("#revision-prompt"));
         });
 
         cut.Find("button[data-command='new']").Click();
@@ -422,7 +428,7 @@ public sealed class HomePageTests : BunitContext
         cut.WaitForAssertion(() =>
         {
             Assert.False(cut.Find("#initial-prompt").HasAttribute("disabled"));
-            Assert.True(cut.Find("#revision-prompt").HasAttribute("disabled"));
+            Assert.Empty(cut.FindAll("#revision-prompt"));
         });
     }
 

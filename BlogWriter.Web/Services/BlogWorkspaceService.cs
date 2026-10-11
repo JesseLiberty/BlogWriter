@@ -30,12 +30,9 @@ public sealed class BlogWorkspaceService : IDisposable
             return SubmitInitialAsync();
         }
 
-        // While revising, the writing prompt is locked, so only the revision can be submitted.
         if (State.IsRevisionRequested)
         {
-            return string.IsNullOrWhiteSpace(State.RevisionPrompt)
-                ? Task.CompletedTask
-                : SubmitRevisionAsync();
+            return Task.CompletedTask;
         }
 
         if (!string.IsNullOrWhiteSpace(State.InitialPrompt))
@@ -65,32 +62,7 @@ public sealed class BlogWorkspaceService : IDisposable
                 output));
     }
 
-    public Task SubmitRevisionAsync()
-    {
-        if (State.ActiveSession is null)
-        {
-            SetValidation("Create or load a session before submitting a revision.");
-            return Task.CompletedTask;
-        }
-
-        BlogSession activeSession = State.ActiveSession;
-        if (!TryCaptureRange(out WordRange range))
-        {
-            return Task.CompletedTask;
-        }
-
-        string revision = State.RevisionPrompt;
-        return RunSessionOperationAsync(
-            revision,
-            range,
-            (cancellationToken, output) => _sessions.ReviseAsync(
-                activeSession,
-                revision,
-                range.Min,
-                range.Max,
-                cancellationToken,
-                output));
-    }
+    public Task SubmitRevisionAsync() => Task.CompletedTask;
 
     public async Task StopAsync()
     {

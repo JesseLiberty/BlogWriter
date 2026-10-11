@@ -4,8 +4,11 @@
     <header class="app-header">
         <a class="brand" href="/">Blog Writer</a>
         <AuthorizeView>
-            <Authorized Context="auth">
-                <span class="user-name">@auth.User.Identity?.Name</span>
+            <Authorized>
+                <span class="user-name">
+                    <span class="display-name">Jesse Liberty</span>
+                    <span class="user-role">Senior AI Engineer</span>
+                </span>
                 <a class="sign-out" href="MicrosoftIdentity/Account/SignOut">Sign out</a>
             </Authorized>
         </AuthorizeView>

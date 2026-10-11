@@ -114,11 +114,7 @@ public sealed class BlogWorkspaceState
     /// </summary>
     public bool IsRevisionRequested { get; internal set; }
 
-    public bool IsRevisionInputEnabled =>
-        !IsBusy &&
-        Mode != WorkspaceMode.List &&
-        Mode != WorkspaceMode.Ended &&
-        !string.IsNullOrWhiteSpace(InitialPrompt);
+    public bool IsRevisionInputEnabled => false;
 
     /// <summary>
     /// The writing prompt is locked while revising; New unlocks it again.
