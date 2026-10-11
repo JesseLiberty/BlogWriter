@@ -62,7 +62,8 @@ public sealed class SessionListBrowserTests : BunitContext
                 const draft = box('.work-grid'), commands = box('.command-bar');
                 const near = (left, right) => Math.abs(left - right) <= 2;
                 if (window.innerWidth === 1280) {
-                    if (!near(query.width, 569.8125 * 1.20)) issues.push('query width does not match captured baseline');
+                    if (!near(query.width, 683.765625 / 2)) issues.push('query width is not half the previous desktop width');
+                    if (!near(draft.width, 1151.625 / 2)) issues.push('draft width is not half the previous desktop width');
                     if (targets.left < query.right) issues.push('targets not right of query');
                     if (!near(draft.left, query.left) || !near(draft.right, targets.right)) issues.push('draft edges');
                     if (!near(commands.left, query.left)) issues.push('command edge');

@@ -43,7 +43,7 @@ button, a { touch-action: manipulation; }
 
 .app-header {
     min-height: 58px;
-    padding: 0 4vw;
+    padding: 0 calc((100% - (min(1480px, 100%) / 2 - 4vw + 13px)) / 2);
     border-bottom: 1px solid var(--ink);
     display: flex;
     align-items: center;
@@ -64,7 +64,7 @@ button, a { touch-action: manipulation; }
 .display-name { color: var(--ink); }
 .user-role { font-size: .68rem; }
 .sign-out { color: var(--forest-dark); font-size: .78rem; }
-.app-main { width: min(1480px, 100%); margin: 0 auto; padding: 24px 4vw 32px; }
+.app-main { width: calc(min(1480px, 100%) / 2 + 4vw + 13px); margin: 0 auto; padding: 24px 4vw 32px; }
 
 .workspace { display: grid; gap: 18px; }
 .workspace-intro { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
@@ -74,7 +74,7 @@ button, a { touch-action: manipulation; }
 
 .prompt-strip {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+    grid-template-columns: minmax(0, calc(60% - 3.6px)) minmax(0, 1fr);
     gap: 12px;
     padding: 12px;
     border: 1px solid var(--ink);
@@ -220,7 +220,7 @@ button.session-entry:disabled { opacity: .65; cursor: wait; }
     .app-header { flex-wrap: wrap; padding: 10px 16px; gap: 10px 12px; }
     .brand { flex-basis: 100%; margin-right: 0; }
     .user-name { margin-right: auto; }
-    .app-main { padding: 18px 14px 24px; }
+    .app-main { width: 100%; padding: 18px 14px 24px; }
     .workspace-intro { align-items: start; flex-direction: column; gap: 8px; }
     .prompt-strip, .work-grid { grid-template-columns: 1fr; }
     .word-range-row { grid-template-columns: minmax(0, 1fr); }
