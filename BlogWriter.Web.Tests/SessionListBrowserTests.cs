@@ -61,7 +61,14 @@ public sealed class SessionListBrowserTests : BunitContext
                 const maxLabel = box('label[for="max-words"]'), max = box('#max-words');
                 const draft = box('.work-grid'), commands = box('.command-bar');
                 const near = (left, right) => Math.abs(left - right) <= 2;
+                const rootSize = parseFloat(getComputedStyle(document.documentElement).fontSize);
+                const previousHeadlineSize = Math.min(4.3 * rootSize, Math.max(2 * rootSize, window.innerWidth * .05));
+                if (!near(parseFloat(getComputedStyle(document.querySelector('h1')).fontSize), previousHeadlineSize * .75)) issues.push('headline not reduced by 25%');
+                const content = getComputedStyle(document.querySelector('.draft-pane .pane-content'));
+                const previousContentLimit = window.innerWidth <= 720 ? .25 : .36;
+                if (!near(parseFloat(content.maxHeight), window.innerHeight * previousContentLimit * .75)) issues.push('draft content limit not reduced by 25%');
                 if (window.innerWidth === 1280) {
+                    if (!near(draft.height, window.innerHeight * .32 * .75)) issues.push('draft height not reduced by 25%');
                     if (!near(query.width, 683.765625 / 2)) issues.push('query width is not half the previous desktop width');
                     if (!near(draft.width, 1151.625 / 2)) issues.push('draft width is not half the previous desktop width');
                     if (targets.left < query.right) issues.push('targets not right of query');
