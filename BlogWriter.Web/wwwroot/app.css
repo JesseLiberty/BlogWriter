@@ -68,7 +68,7 @@ button, a { touch-action: manipulation; }
 
 .workspace { display: grid; gap: 18px; }
 .workspace-intro { display: flex; align-items: end; justify-content: space-between; gap: 2rem; }
-.workspace-intro h1 { margin: 0; font: 650 clamp(2rem, 5vw, 4.3rem)/.95 "Newsreader", serif; }
+.workspace-intro h1 { margin: 0; font: 650 clamp(1.5rem, 3.75vw, 3.225rem)/.95 "Newsreader", serif; }
 .workspace-summary { max-width: 40ch; margin: 0 0 .3rem; color: var(--muted); font-size: .82rem; }
 .eyebrow, .dialog-kicker { margin: 0 0 .35rem; color: var(--coral); font-size: .7rem; font-weight: 500; text-transform: uppercase; }
 
@@ -126,13 +126,13 @@ button, a { touch-action: manipulation; }
 .range-error { color: #9d2c20; font-size: .68rem; line-height: 1.25; overflow-wrap: anywhere; }
 .command-bar .range-go { align-self: end; min-height: 36px; padding: 6px 12px; }
 
-.work-grid { min-width: 0; min-height: 32vh; margin-inline: 13px; display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--ink); }
+.work-grid { min-width: 0; min-height: 24vh; margin-inline: 13px; display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--ink); }
 .work-pane { min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--surface); }
 .work-pane + .work-pane { border-left: 1px solid var(--ink); }
 .pane-heading { min-height: 48px; padding: 0 14px; border-bottom: 1px solid var(--ink); display: flex; align-items: center; gap: 10px; }
 .pane-heading h2 { margin: 0; font: 650 1.2rem/1 "Newsreader", serif; }
 .pane-index { color: var(--coral); font-size: .68rem; }
-.pane-content { min-width: 0; min-height: 0; max-height: 36vh; overflow: auto; padding: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pane-content { min-width: 0; min-height: 0; max-height: 27vh; overflow: auto; padding: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .empty-copy { color: var(--muted); }
 .review-copy { border-left: 3px solid var(--forest); padding-left: 14px; }
 
@@ -227,7 +227,7 @@ button.session-entry:disabled { opacity: .65; cursor: wait; }
     .range-heading { grid-column: 1 / -1; }
     .work-pane + .work-pane { border-left: 0; border-top: 1px solid var(--ink); }
     .work-grid { min-height: 0; }
-    .pane-content { max-height: 25vh; }
+    .pane-content { max-height: 18.75vh; }
     .workspace-footer { display: flex; align-items: stretch; flex-direction: column; }
     .command-bar { display: grid; width: 100%; grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .command-bar button { min-width: 0; padding-inline: 4px; font-size: .7rem; }
