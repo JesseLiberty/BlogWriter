@@ -25,7 +25,8 @@ public sealed class SessionListBrowserTests : BunitContext
         using IPlaywright playwright = await Playwright.CreateAsync();
         await using IBrowser browser = await playwright.Chromium.LaunchAsync(new()
         {
-            Headless = true, Args = ["--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"],
+            Headless = true,
+            Args = ["--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"],
         });
         IPage page = await browser.NewPageAsync(new() { ViewportSize = new() { Width = width, Height = 900 } });
         await OpenInteractiveWorkspaceAsync(page, client.BaseAddress!);
@@ -111,7 +112,8 @@ public sealed class SessionListBrowserTests : BunitContext
         using IPlaywright playwright = await Playwright.CreateAsync();
         await using IBrowser browser = await playwright.Chromium.LaunchAsync(new()
         {
-            Headless = true, Args = ["--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"],
+            Headless = true,
+            Args = ["--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"],
         });
         IPage page = await browser.NewPageAsync(new() { ViewportSize = new() { Width = width, Height = 900 } });
         await OpenInteractiveWorkspaceAsync(page, client.BaseAddress!);
