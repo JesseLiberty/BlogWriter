@@ -13,6 +13,177 @@ namespace BlogWriter.Web.Tests;
 public sealed class SessionListBrowserTests : BunitContext
 {
     [Theory]
+    [InlineData(320, 1.0)]
+    [InlineData(1280, 1.0)]
+    [InlineData(320, 1.25)]
+    [InlineData(1280, 1.25)]
+    public async Task WorkspaceGeometry_MatchesCapturedBaselineAndAlignedTargets(int width, double textScale)
+    {
+        await using var factory = new LiveWorkspaceFactory(new SavedListSessionService());
+        factory.UseKestrel(0);
+        using HttpClient client = factory.CreateClient();
+        using IPlaywright playwright = await Playwright.CreateAsync();
+        await using IBrowser browser = await playwright.Chromium.LaunchAsync(new()
+        {
+            Headless = true,
+            Args = ["--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"],
+        });
+        IPage page = await browser.NewPageAsync(new() { ViewportSize = new() { Width = width, Height = 900 } });
+        await OpenInteractiveWorkspaceAsync(page, client.BaseAddress!);
+        await page.EvaluateAsync("() => document.fonts.ready");
+        await page.EvaluateAsync("scale => document.documentElement.style.fontSize = (16 * scale) + 'px'", textScale);
+        await Assertions.Expect(page.Locator("h1")).ToHaveTextAsync("Research. Write. Revise.");
+        await Assertions.Expect(page.Locator(".display-name")).ToHaveTextAsync("Jesse Liberty");
+        await Assertions.Expect(page.Locator(".user-role")).ToHaveTextAsync("Senior AI Engineer");
+        await Assertions.Expect(page.Locator("a.sign-out")).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("#revision-prompt, [aria-labelledby='review-heading'], .workspace-summary, .draft-pane .pane-index")).ToHaveCountAsync(0);
+        Assert.True(await page.EvaluateAsync<bool>("() => document.querySelector('.user-role').getBoundingClientRect().top >= document.querySelector('.display-name').getBoundingClientRect().bottom"));
+        await page.Locator("#initial-prompt").FillAsync(new string('Q', 200));
+        string geometry = await page.EvaluateAsync<string>("""
+            () => {
+                const box = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+                const strip = getComputedStyle(document.querySelector('.prompt-strip'));
+                return JSON.stringify({ viewport: window.innerWidth, zoom: devicePixelRatio,
+                    query: box('#initial-prompt'), strip: box('.prompt-strip'), draft: box('.draft-pane'),
+                    commands: box('.command-bar'), padding: strip.padding, border: strip.borderWidth, gap: strip.gap });
+            }
+            """);
+        string results = Path.Combine(AppContext.BaseDirectory, "TestResults");
+        Directory.CreateDirectory(results);
+        await File.WriteAllTextAsync(Path.Combine(results, $"workspace-after-{width}-{textScale}.json"), geometry);
+        await page.ScreenshotAsync(new() { Path = Path.Combine(results, $"workspace-after-{width}-{textScale}.png"), FullPage = true });
+        string[] issues = await page.EvaluateAsync<string[]>("""
+            () => {
+                const issues = [];
+                const box = selector => document.querySelector(selector).getBoundingClientRect();
+                const query = box('#initial-prompt'), targets = box('.word-range-row');
+                const minLabel = box('label[for="min-words"]'), min = box('#min-words');
+                const maxLabel = box('label[for="max-words"]'), max = box('#max-words');
+                const draft = box('.work-grid'), commands = box('.command-bar');
+                const near = (left, right) => Math.abs(left - right) <= 2;
+                if (window.innerWidth === 1280) {
+                    if (!near(query.width, 569.8125 * 1.20)) issues.push('query width does not match captured baseline');
+                    if (targets.left < query.right) issues.push('targets not right of query');
+                    if (!near(draft.left, query.left) || !near(draft.right, targets.right)) issues.push('draft edges');
+                    if (!near(commands.left, query.left)) issues.push('command edge');
+                }
+                if (!near(minLabel.left, min.left) || !near(maxLabel.left, max.left) || !near(min.left, max.left) || !near(min.width, max.width)) issues.push('target alignment');
+                if (min.top < minLabel.bottom || maxLabel.top < min.bottom || max.top < maxLabel.bottom) issues.push('target order');
+                if (draft.top < Math.max(query.bottom, targets.bottom) || commands.top < draft.bottom) issues.push('overlapping sections');
+                if (document.documentElement.scrollWidth > window.innerWidth) issues.push('page overflow');
+                for (const button of document.querySelectorAll('.command-bar button')) {
+                    if (button.scrollWidth > button.clientWidth) issues.push('button label overflow');
+                }
+                return issues;
+            }
+            """);
+        Assert.Empty(issues);
+        await page.Locator("#min-words").FillAsync("0");
+        await page.Locator("#max-words").FillAsync("0");
+        await Assertions.Expect(page.Locator("#min-words-error")).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("#max-words-error")).ToBeVisibleAsync();
+        Assert.True(await page.EvaluateAsync<bool>("() => document.querySelector('.word-range-row').getBoundingClientRect().bottom <= document.querySelector('.work-grid').getBoundingClientRect().top && document.documentElement.scrollWidth <= window.innerWidth"));
+    }
+
+    [Theory]
+    [InlineData(320)]
+    [InlineData(1280)]
+    public async Task WorkspaceControls_KeepKeyboardAccessAndInitialWritingWithoutRevisions(int width)
+    {
+        string? submittedQuery = null;
+        WordRange? submittedRange = null;
+        var sessions = new SavedListSessionService
+        {
+            StartResult = (query, min, max) =>
+            {
+                submittedQuery = query;
+                submittedRange = new WordRange(min, max);
+                BlogSession result = ListLauncherTestHelpers.Session(query, draft: new string('D', 200), review: "internal review");
+                result.State.MinWords = min;
+                result.State.MaxWords = max;
+                return result;
+            },
+        };
+        sessions.Sessions.Add(ListLauncherTestHelpers.Session("stored topic", "stored revision", "stored draft", "stored review"));
+        string saved = System.Text.Json.JsonSerializer.Serialize(sessions.Sessions);
+        await using var factory = new LiveWorkspaceFactory(sessions);
+        factory.UseKestrel(0);
+        using HttpClient client = factory.CreateClient();
+        using IPlaywright playwright = await Playwright.CreateAsync();
+        await using IBrowser browser = await playwright.Chromium.LaunchAsync(new()
+        {
+            Headless = true,
+            Args = ["--disable-features=LocalNetworkAccessChecks,LocalNetworkAccessChecksWebSockets"],
+        });
+        IPage page = await browser.NewPageAsync(new() { ViewportSize = new() { Width = width, Height = 900 } });
+        await OpenInteractiveWorkspaceAsync(page, client.BaseAddress!);
+        var reached = new HashSet<string>();
+        await page.Locator("a.brand").FocusAsync();
+        for (int index = 0; index < 15; index++)
+        {
+            await page.Keyboard.PressAsync("Tab");
+            string active = await page.EvaluateAsync<string>("() => document.activeElement.id || document.activeElement.dataset.command || (document.activeElement.matches('a.sign-out') ? 'sign-out' : '')");
+            if (!string.IsNullOrEmpty(active)) reached.Add(active);
+            if (active.Length > 0)
+            {
+                Assert.True(await page.EvaluateAsync<bool>("() => getComputedStyle(document.activeElement).outlineStyle !== 'none'"));
+            }
+        }
+        foreach (string control in new[] { "initial-prompt", "min-words", "max-words", "new", "list", "go", "quit", "help", "sign-out" })
+        {
+            Assert.Contains(control, reached);
+        }
+        Assert.DoesNotContain("revision-prompt", reached);
+        await page.Locator("button[data-command='help']").ClickAsync();
+        await Assertions.Expect(page.Locator(".run-command-dialog")).ToBeVisibleAsync();
+        await page.Locator("button[data-command='close-help']").ClickAsync();
+        await Assertions.Expect(page.Locator(".run-command-dialog")).ToHaveCountAsync(0);
+        await page.Locator("button[data-command='list']").ClickAsync();
+        await Assertions.Expect(page.Locator("button.session-entry")).ToHaveCountAsync(1);
+        await page.Locator("button.session-entry").ClickAsync();
+        await Assertions.Expect(page.Locator("#initial-prompt")).ToHaveValueAsync("stored topic");
+        await page.Locator("#initial-prompt").FillAsync("fresh query");
+        await page.Locator("#min-words").FillAsync("700");
+        await page.Locator("#max-words").FillAsync("1350");
+        await page.Locator("button[data-command='go']").FocusAsync();
+        await page.Keyboard.PressAsync("Enter");
+        await Assertions.Expect(page.Locator(".draft-copy")).ToHaveTextAsync(new string('D', 200));
+        await Assertions.Expect(page.Locator("#initial-prompt")).ToBeDisabledAsync();
+        await page.Locator("button[data-command='go']").ClickAsync();
+        await page.Locator("button[data-command='help']").ClickAsync();
+        await Assertions.Expect(page.Locator(".run-command-dialog")).ToBeVisibleAsync();
+        Assert.Equal("fresh query", submittedQuery);
+        Assert.Equal(new WordRange(700, 1350), submittedRange);
+        Assert.Equal(1, sessions.StartCalls);
+        Assert.Equal(0, sessions.RevisionCalls);
+        Assert.Equal(saved, System.Text.Json.JsonSerializer.Serialize(sessions.Sessions));
+        Assert.True(await page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= window.innerWidth && document.querySelector('.draft-copy').scrollWidth <= document.querySelector('.pane-content').clientWidth"));
+        await page.Locator("button[data-command='close-help']").ClickAsync();
+        await page.Locator("button[data-command='quit']").ClickAsync();
+        await Assertions.Expect(page.Locator(".ended-state")).ToBeVisibleAsync();
+    }
+
+    private static async Task OpenInteractiveWorkspaceAsync(IPage page, Uri address)
+    {
+        var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        page.Console += (_, message) =>
+        {
+            if (message.Text.Contains("WebSocket connected", StringComparison.Ordinal)) connected.TrySetResult();
+        };
+        await page.RouteAsync(address.ToString(), async route =>
+        {
+            IAPIResponse response = await route.FetchAsync();
+            string html = System.Text.RegularExpressions.Regex.Replace(await response.TextAsync(),
+                "(<script\\b[^>]*\\bsrc=\"[^\"]*blazor[^>]*)(>)", "$1 autostart=\"false\"$2");
+            await route.FulfillAsync(new() { Response = response, Body = html });
+        });
+        await page.GotoAsync(address.ToString());
+        await page.EvaluateAsync("() => Blazor.start()");
+        await connected.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await page.WaitForFunctionAsync("() => Array.from(document.querySelector('#initial-prompt').attributes).some(attribute => attribute.name.startsWith('_bl_'))");
+    }
+
+    [Theory]
     [InlineData(320)]
     [InlineData(1280)]
     public async Task LiveWorkspace_RestoresByPointerAndKeyboardAndBlocksConcurrentSelection(int width)
@@ -88,7 +259,8 @@ public sealed class SessionListBrowserTests : BunitContext
                 await page.Keyboard.PressAsync(index == 1 ? "Enter" : "Space");
             }
             await Assertions.Expect(page.Locator("#initial-prompt")).ToHaveValueAsync($"saved topic {index}");
-            await Assertions.Expect(page.Locator("#revision-prompt")).ToHaveValueAsync($"revision {index}");
+            await Assertions.Expect(page.Locator("#revision-prompt")).ToHaveCountAsync(0);
+            Assert.Equal($"revision {index}", sessions.Sessions[index].State.CurrentSubTask);
             await Assertions.Expect(page.Locator("#min-words")).ToHaveValueAsync((700 + index).ToString());
             await Assertions.Expect(page.Locator("#max-words")).ToHaveValueAsync((1350 + index).ToString());
             Assert.Equal(sessions.Sessions.Take(index + 1).Select(session => session.Id), sessions.LoadedIds.ToArray());

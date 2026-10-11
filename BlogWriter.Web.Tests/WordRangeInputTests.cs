@@ -12,12 +12,32 @@ public sealed class WordRangeInputTests : BunitContext
             .Add(component => component.MinValue, "1000")
             .Add(component => component.MaxValue, "2000"));
 
-        Assert.Equal("Min", cut.Find("label[for='min-words']").TextContent.Trim());
-        Assert.Equal("Max", cut.Find("label[for='max-words']").TextContent.Trim());
+        Assert.Equal("Target Words", cut.Find("#word-range-heading").TextContent.Trim());
+        Assert.Equal("Minimum", cut.Find("label[for='min-words']").TextContent.Trim());
+        Assert.Equal("Maximum", cut.Find("label[for='max-words']").TextContent.Trim());
+        Assert.Empty(cut.FindAll(".range-separator"));
+        Assert.Equal(new[] { "word-range-heading", "", "min-words", "", "max-words" },
+            cut.FindAll("#word-range-heading, label, input").Select(element => element.Id).ToArray());
         Assert.Equal("1000", cut.Find("#min-words").GetAttribute("value"));
         Assert.Equal("2000", cut.Find("#max-words").GetAttribute("value"));
         Assert.Equal("numeric", cut.Find("#min-words").GetAttribute("inputmode"));
         Assert.Equal("numeric", cut.Find("#max-words").GetAttribute("inputmode"));
+    }
+
+    [Fact]
+    public void Component_PreservesValueCallbacksAndDisabledState()
+    {
+        string? min = null;
+        string? max = null;
+        var cut = Render<WordRangeInput>(parameters => parameters
+            .Add(component => component.MinValueChanged, (string value) => min = value)
+            .Add(component => component.MaxValueChanged, (string value) => max = value));
+        cut.Find("#min-words").Input("700");
+        cut.Find("#max-words").Input("1350");
+        Assert.Equal("700", min);
+        Assert.Equal("1350", max);
+        var disabled = Render<WordRangeInput>(parameters => parameters.Add(component => component.Disabled, true));
+        Assert.All(disabled.FindAll("input"), input => Assert.True(input.HasAttribute("disabled")));
     }
 
     [Fact]

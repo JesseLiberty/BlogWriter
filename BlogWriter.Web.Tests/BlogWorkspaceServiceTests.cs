@@ -27,7 +27,72 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public void RevisionInput_EnablesForNonEmptyQueryBeforeDraftExists()
+    public async Task WebRevision_GoAndDirectEntryPreserveCompletedSessionWithoutWork()
+    {
+        var sessions = new StubSessionService();
+        var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
+        workspace.State.InitialPrompt = "topic";
+        await workspace.SubmitAsync();
+        BlogSession source = workspace.State.ActiveSession!;
+        string saved = System.Text.Json.JsonSerializer.Serialize(source);
+        workspace.State.RevisionPrompt = "stale revision request";
+        var before = (workspace.State.Draft, workspace.State.Review, workspace.State.AcceptedRange,
+            workspace.State.CurrentStatus, workspace.State.ValidationMessage);
+
+        await workspace.SubmitAsync();
+        await workspace.SubmitRevisionAsync();
+
+        Assert.Equal(1, sessions.StartCalls);
+        Assert.Equal(0, sessions.RevisionCalls);
+        Assert.Equal(before, (workspace.State.Draft, workspace.State.Review, workspace.State.AcceptedRange,
+            workspace.State.CurrentStatus, workspace.State.ValidationMessage));
+        Assert.Equal(saved, System.Text.Json.JsonSerializer.Serialize(source));
+        Assert.False(workspace.State.IsInitialPromptEnabled);
+        Assert.False(workspace.State.IsProcessing);
+    }
+
+    [Theory]
+    [InlineData(WorkspaceMode.New)]
+    [InlineData(WorkspaceMode.Draft)]
+    [InlineData(WorkspaceMode.List)]
+    [InlineData(WorkspaceMode.Ended)]
+    public async Task WebRevision_DirectEntryIsInertInEveryMode(WorkspaceMode mode)
+    {
+        var sessions = new StubSessionService();
+        var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
+        if (mode == WorkspaceMode.Draft)
+        {
+            workspace.State.InitialPrompt = "topic";
+            await workspace.SubmitInitialAsync();
+        }
+        else if (mode == WorkspaceMode.List)
+        {
+            await workspace.ListAsync(false);
+        }
+        else if (mode == WorkspaceMode.Ended)
+        {
+            await workspace.QuitAsync(true);
+        }
+        int starts = sessions.StartCalls;
+        workspace.State.RevisionPrompt = "historical revision";
+        await workspace.SubmitRevisionAsync();
+        Assert.Equal(starts, sessions.StartCalls);
+        Assert.Equal(0, sessions.RevisionCalls);
+        Assert.Null(workspace.State.ValidationMessage);
+        Assert.Equal(mode, workspace.State.Mode);
+    }
+
+    [Fact]
+    public void WebRevision_InputCannotBeEnabledByQueryOrDraft()
+    {
+        var state = new BlogWorkspaceState { InitialPrompt = "topic", RevisionPrompt = "stale", Draft = "draft" };
+        Assert.False(state.IsRevisionInputEnabled);
+        state.Draft = "";
+        Assert.False(state.IsRevisionInputEnabled);
+    }
+
+    [Fact]
+    public void RevisionInput_RemainsDisabledForNonEmptyQueryBeforeDraftExists()
     {
         var state = new BlogWorkspaceState();
 
@@ -36,7 +101,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         state.InitialPrompt = "topic";
 
         Assert.False(state.HasDraft);
-        Assert.True(state.IsRevisionInputEnabled);
+        Assert.False(state.IsRevisionInputEnabled);
     }
 
     [Fact]
@@ -45,14 +110,14 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         var state = new BlogWorkspaceState();
         state.InitialPrompt = "topic";
 
-        Assert.True(state.IsRevisionInputEnabled);
+        Assert.False(state.IsRevisionInputEnabled);
         state.RevisionPrompt = "make it shorter";
-        Assert.True(state.IsRevisionInputEnabled);
+        Assert.False(state.IsRevisionInputEnabled);
 
         state.Draft = "draft";
-        Assert.True(state.IsRevisionInputEnabled);
+        Assert.False(state.IsRevisionInputEnabled);
         state.Draft = "";
-        Assert.True(state.IsRevisionInputEnabled);
+        Assert.False(state.IsRevisionInputEnabled);
     }
 
     [Theory]
@@ -72,7 +137,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public void RevisionInput_RemainsEnabledWhenDraftIsClearedWhileQueryRemains()
+    public void RevisionInput_RemainsDisabledWhenDraftIsClearedWhileQueryRemains()
     {
         var workspace = new BlogWorkspaceService(new StubSessionService(), TimeSpan.FromMilliseconds(25));
         workspace.State.InitialPrompt = "topic";
@@ -80,11 +145,11 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         workspace.State.Draft = "";
 
-        Assert.True(workspace.State.IsRevisionInputEnabled);
+        Assert.False(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]
-    public async Task RevisionInput_EnablesWhenListItemIsSelected()
+    public async Task RevisionInput_RemainsDisabledWhenListItemIsSelected()
     {
         BlogSessionSummary summary = CreateSummary("one");
         var sessions = new StubSessionService { Summaries = [summary] };
@@ -93,7 +158,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         await workspace.RestoreSelectionAsync(summary);
 
-        Assert.True(workspace.State.IsRevisionInputEnabled);
+        Assert.False(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]
@@ -108,14 +173,14 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task DraftState_EnablesRevisionInput()
+    public async Task DraftState_DoesNotEnableRevisionInput()
     {
         var workspace = new BlogWorkspaceService(new StubSessionService(), TimeSpan.FromMilliseconds(25));
         workspace.State.InitialPrompt = "topic";
 
         await workspace.SubmitInitialAsync();
 
-        Assert.True(workspace.State.IsRevisionInputEnabled);
+        Assert.False(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]
@@ -224,7 +289,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SubmitAsync_SubmitsRevisionWhileRevising()
+    public async Task SubmitAsync_DoesNotSubmitHistoricalRevision()
     {
         var sessions = new StubSessionService();
         var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
@@ -235,7 +300,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         await workspace.SubmitAsync();
 
         Assert.Equal(1, sessions.StartCalls);
-        Assert.Equal(1, sessions.RevisionCalls);
+        Assert.Equal(0, sessions.RevisionCalls);
         Assert.Equal("topic", workspace.State.InitialPrompt);
         Assert.Equal("make it shorter", workspace.State.RevisionPrompt);
     }
@@ -265,7 +330,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         Assert.Equal("topic", workspace.State.InitialPrompt);
         Assert.False(workspace.State.IsInitialPromptEnabled);
-        Assert.True(workspace.State.IsRevisionInputEnabled);
+        Assert.False(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]
@@ -300,11 +365,11 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         Assert.Equal("topic", workspace.State.InitialPrompt);
         Assert.False(workspace.State.IsInitialPromptEnabled);
-        Assert.True(workspace.State.IsRevisionInputEnabled);
+        Assert.False(workspace.State.IsRevisionInputEnabled);
     }
 
     [Fact]
-    public async Task SubmittedPromptText_DoesNotRequireDiscardConfirmation()
+    public async Task UnsubmittedHistoricalRevisionStillRequiresDiscardConfirmation()
     {
         var workspace = new BlogWorkspaceService(new StubSessionService(), TimeSpan.FromMilliseconds(25));
         workspace.State.InitialPrompt = "topic";
@@ -312,7 +377,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         workspace.State.RevisionPrompt = "shorter";
         await workspace.SubmitRevisionAsync();
 
-        Assert.False(workspace.State.HasUnsavedText);
+        Assert.True(workspace.State.HasUnsavedText);
 
         workspace.State.RevisionPrompt = "shorter still";
 
@@ -362,7 +427,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         Assert.Empty(workspace.State.Review);
         Assert.Null(workspace.State.ActiveSession);
         Assert.True(workspace.State.IsInitialPromptEnabled);
-        Assert.True(workspace.State.IsRevisionInputEnabled);
+        Assert.False(workspace.State.IsRevisionInputEnabled);
         Assert.True(workspace.State.IsWordRangeEnabled);
         Assert.True(workspace.State.IsGoCommandEnabled);
         Assert.Equal(WorkspaceMode.Draft, workspace.State.Mode);
@@ -455,7 +520,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ReviewerOutput_AccumulatesAcrossRevisionsAndResetsForNewSession()
+    public async Task ReviewerOutput_IsPreservedWhenRevisionIsIgnoredAndResetsForNewSession()
     {
         var sessions = new StubSessionService();
         var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
@@ -466,8 +531,9 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         await workspace.SubmitRevisionAsync();
 
         Assert.Contains("review", workspace.State.Review);
-        Assert.Contains("revision review", workspace.State.Review);
-        Assert.Equal(2, workspace.State.Review.Split("\n\n", StringSplitOptions.None).Length);
+        Assert.DoesNotContain("revision review", workspace.State.Review);
+        Assert.Single(workspace.State.Review.Split("\n\n", StringSplitOptions.None));
+        Assert.Equal(0, sessions.RevisionCalls);
 
         await workspace.NewAsync(discardConfirmed: true);
 
@@ -762,16 +828,16 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task StopAsync_ReportsTimeoutAndKeepsRevisionLockedUntilItEnds()
+    public async Task StopAsync_ReportsTimeoutAndKeepsInitialOperationLockedUntilItEnds()
     {
         var sessions = new StubSessionService();
         var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
         workspace.State.InitialPrompt = "topic";
         await workspace.SubmitInitialAsync();
-        workspace.State.RevisionPrompt = "revise the ending";
-        sessions.PendingRevision = new TaskCompletionSource<BlogSession>();
-        Task revise = workspace.SubmitRevisionAsync();
-        await sessions.RevisionStarted.Task;
+        await workspace.NewAsync(true);
+        workspace.State.InitialPrompt = "second topic";
+        sessions.PendingStart = new TaskCompletionSource<BlogSession>();
+        Task submission = workspace.SubmitInitialAsync();
 
         sessions.LastOutput!.Report(CreateStageUpdate(WorkflowAgentStage.Reviewer, "reviewer-started"));
         Assert.True(workspace.State.IsStopCommandEnabled);
@@ -784,10 +850,10 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         Assert.True(workspace.State.IsStopping);
         Assert.Equal("Cancellation failed", workspace.State.CurrentStatus);
         Assert.All(GetCommandEnabledStates(workspace.State), Assert.False);
-        Assert.Equal(WorkspaceMode.Draft, workspace.State.Mode);
+        Assert.Equal(WorkspaceMode.New, workspace.State.Mode);
 
-        sessions.PendingRevision.SetResult(CreateSession("late revised draft"));
-        await Task.WhenAll(revise, stop);
+        sessions.PendingStart.SetResult(CreateSession("late draft"));
+        await Task.WhenAll(submission, stop);
 
         Assert.Equal(WorkspaceMode.New, workspace.State.Mode);
         Assert.Empty(workspace.State.Draft);
@@ -848,7 +914,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SubmitRevisionAsync_PublishesCompletedRevision()
+    public async Task SubmitRevisionAsync_PreservesCompletedDraftAndReview()
     {
         var sessions = new StubSessionService();
         var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
@@ -858,9 +924,10 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         await workspace.SubmitRevisionAsync();
 
-        Assert.Equal("revised: make it shorter", workspace.State.Draft);
+        Assert.Equal("draft: topic", workspace.State.Draft);
         Assert.Contains("review", workspace.State.Review);
-        Assert.Contains("revision review", workspace.State.Review);
+        Assert.DoesNotContain("revision review", workspace.State.Review);
+        Assert.Equal(0, sessions.RevisionCalls);
         Assert.Equal("make it shorter", workspace.State.RevisionPrompt);
     }
 
@@ -884,7 +951,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SubmitRevisionAsync_UsesChangedRange()
+    public async Task SubmitRevisionAsync_DoesNotAcceptOrSubmitChangedRange()
     {
         var sessions = new StubSessionService();
         var workspace = new BlogWorkspaceService(sessions, TimeSpan.FromMilliseconds(25));
@@ -896,8 +963,11 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
 
         await workspace.SubmitRevisionAsync();
 
-        Assert.Equal(new WordRange(650, 750), sessions.LastRevisionRange);
-        Assert.Equal(new WordRange(650, 750), workspace.State.AcceptedRange);
+        Assert.Null(sessions.LastRevisionRange);
+        Assert.Equal(WordRange.Default, workspace.State.AcceptedRange);
+        Assert.Equal("650", workspace.State.MinWordsInput);
+        Assert.Equal("750", workspace.State.MaxWordsInput);
+        Assert.Equal(0, sessions.RevisionCalls);
     }
 
     [Fact]
@@ -956,7 +1026,7 @@ public sealed class BlogWorkspaceServiceTests : IDisposable
         public WordRange? LastRevisionRange { get; private set; }
         public IReadOnlyList<BlogSessionSummary> Summaries { get; set; } = [];
         public BlogSession? SessionToLoad { get; init; }
-        public TaskCompletionSource<BlogSession>? PendingStart { get; init; }
+        public TaskCompletionSource<BlogSession>? PendingStart { get; set; }
         public TaskCompletionSource<BlogSession>? PendingRevision { get; set; }
         public TaskCompletionSource<IReadOnlyList<BlogSessionSummary>>? PendingList { get; init; }
         public TaskCompletionSource Started { get; } = new();

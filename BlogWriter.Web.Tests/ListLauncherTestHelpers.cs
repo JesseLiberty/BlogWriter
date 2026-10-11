@@ -33,6 +33,7 @@ internal sealed class SavedListSessionService : IBlogWriterSessionService
     public int StartCalls { get; private set; }
     public int RevisionCalls { get; private set; }
     public int ListCalls { get; private set; }
+    public Func<string, int, int, BlogSession>? StartResult { get; set; }
 
     public Task<IReadOnlyList<BlogSessionSummary>> ListAsync(CancellationToken cancellationToken = default)
     {
@@ -53,6 +54,10 @@ internal sealed class SavedListSessionService : IBlogWriterSessionService
         IProgress<WorkflowOutputUpdate>? output = null)
     {
         StartCalls++;
+        if (StartResult is not null)
+        {
+            return Task.FromResult(StartResult(prompt, minWords, maxWords));
+        }
         throw new InvalidOperationException("List tests must not start writing work.");
     }
 

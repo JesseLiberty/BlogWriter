@@ -1,8 +1,8 @@
 <section class="word-range-row" aria-labelledby="word-range-heading">
-    <span id="word-range-heading" class="range-heading">Target words</span>
+    <span id="word-range-heading" class="range-heading">Target Words</span>
 
     <div class="range-field">
-        <label for="min-words">Min</label>
+        <label for="min-words">Minimum</label>
         <input id="min-words"
                type="text"
                inputmode="numeric"
@@ -19,10 +19,8 @@
         }
     </div>
 
-    <span class="range-separator" aria-hidden="true">to</span>
-
     <div class="range-field">
-        <label for="max-words">Max</label>
+        <label for="max-words">Maximum</label>
         <input id="max-words"
                type="text"
                inputmode="numeric"
@@ -32,7 +30,7 @@
                @oninput="args => MaxValueChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty)"
                aria-invalid="@(MaxError is null ? "false" : "true")"
                aria-describedby="@(MaxError is null ? "max-words-help" : "max-words-help max-words-error")" />
-        <span id="max-words-help" class="sr-only">Maximum target word count. Must be at least Min.</span>
+        <span id="max-words-help" class="sr-only">Maximum target word count. Must be at least Minimum.</span>
         @if (MaxError is not null)
         {
             <span id="max-words-error" class="range-error">@MaxError</span>

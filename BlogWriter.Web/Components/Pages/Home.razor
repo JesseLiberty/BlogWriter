@@ -10,9 +10,8 @@
     <header class="workspace-intro">
         <div>
             <p class="eyebrow">Editorial workspace</p>
-            <h1>Write. Review. Refine.</h1>
+            <h1>Research. Write. Revise.</h1>
         </div>
-        <p class="workspace-summary">A researcher and author for blog pages.</p>
     </header>
 
     @if (Workspace.State.Mode == WorkspaceMode.Ended)
@@ -31,11 +30,13 @@
                          Value="@Workspace.State.InitialPrompt"
                          ValueChanged="value => Workspace.State.InitialPrompt = value"
                          Disabled="@(!Workspace.State.IsInitialPromptEnabled)" />
-            <PromptInput Id="revision-prompt"
-                         Label="Revision request"
-                         Value="@Workspace.State.RevisionPrompt"
-                         ValueChanged="value => Workspace.State.RevisionPrompt = value"
-                         Disabled="@(!Workspace.State.IsRevisionInputEnabled)" />
+            <WordRangeInput Disabled="@(!Workspace.State.IsWordRangeEnabled)"
+                            MinValue="@Workspace.State.MinWordsInput"
+                            MinValueChanged="Workspace.UpdateMinWords"
+                            MaxValue="@Workspace.State.MaxWordsInput"
+                            MaxValueChanged="Workspace.UpdateMaxWords"
+                            MinError="@Workspace.State.MinWordsError"
+                            MaxError="@Workspace.State.MaxWordsError" />
         </section>
 
         <section class="work-grid">
@@ -58,7 +59,6 @@
             {
                 <DraftPane Content="@Workspace.State.Draft" />
             }
-            <ReviewPane Content="@Workspace.State.Review" />
         </section>
 
         <footer class="workspace-footer">
@@ -73,17 +73,7 @@
                         Go="Workspace.SubmitAsync"
                         Stop="Workspace.StopAsync"
                         Quit="() => RequestTransitionAsync(PendingAction.Quit)"
-                        Help="ShowHelp">
-                <ChildContent>
-                    <WordRangeInput Disabled="@(!Workspace.State.IsWordRangeEnabled)"
-                                    MinValue="@Workspace.State.MinWordsInput"
-                                    MinValueChanged="Workspace.UpdateMinWords"
-                                    MaxValue="@Workspace.State.MaxWordsInput"
-                                    MaxValueChanged="Workspace.UpdateMaxWords"
-                                    MinError="@Workspace.State.MinWordsError"
-                                    MaxError="@Workspace.State.MaxWordsError" />
-                </ChildContent>
-            </CommandBar>
+                        Help="ShowHelp" />
 
             <WorkflowLog CurrentStatus="@Workspace.State.CurrentStatus"
                          CurrentStatusOutcome="@Workspace.State.CurrentStatusOutcome" />

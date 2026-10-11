@@ -5,9 +5,12 @@
             <button type="button" data-command="list" disabled="@(!ListEnabled)" @onclick="List">List</button>
         </div>
     </div>
-    <div class="command-range">
-        @ChildContent
-    </div>
+    @if (ChildContent is not null)
+    {
+        <div class="command-range">
+            @ChildContent
+        </div>
+    }
     <div class="command-trailing">
         <button type="button" class="range-go" data-command="go" disabled="@(!GoEnabled)" @onclick="Go">Go</button>
         <button type="button" class="stop-command" data-command="stop" disabled="@(!StopEnabled)" @onclick="Stop">Stop</button>
