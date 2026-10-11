@@ -5,6 +5,7 @@
     --muted: #626b65;
     --paper: #f7f5ee;
     --surface: #fffefa;
+    --pale-blue: #e8f3f8;
     --line: #cbd0c9;
     --forest-light: #bfe6c9;
     --forest: #1e5a46;
@@ -78,7 +79,7 @@ button, a { touch-action: manipulation; }
     gap: 12px;
     padding: 12px;
     border: 1px solid var(--ink);
-    background: var(--surface);
+    background: var(--pale-blue);
 }
 
 .prompt-field { min-width: 0; display: grid; grid-template-rows: auto minmax(66px, 1fr); gap: 6px; }
@@ -129,7 +130,7 @@ button, a { touch-action: manipulation; }
 .work-grid { min-width: 0; min-height: 24vh; margin-inline: 13px; display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid var(--ink); }
 .work-pane { min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--surface); }
 .work-pane + .work-pane { border-left: 1px solid var(--ink); }
-.pane-heading { min-height: 48px; padding: 0 14px; border-bottom: 1px solid var(--ink); display: flex; align-items: center; gap: 10px; }
+.pane-heading { min-height: 48px; padding: 0 14px; border-bottom: 1px solid var(--ink); display: flex; align-items: center; gap: 10px; background: var(--pale-blue); }
 .pane-heading h2 { margin: 0; font: 650 1.2rem/1 "Newsreader", serif; }
 .pane-index { color: var(--coral); font-size: .68rem; }
 .pane-content { min-width: 0; min-height: 0; max-height: 27vh; overflow: auto; padding: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -182,6 +183,7 @@ button.session-entry:disabled { opacity: .65; cursor: wait; }
     text-align: center;
     text-decoration: none;
 }
+.command-bar button { width: 72px; height: 36px; flex: 0 0 72px; }
 .command-bar button:hover:not(:disabled), .dialog-actions button:hover { background: var(--forest); color: white; }
 .command-bar button[data-command="new"], .command-bar button[data-command="quit"] { border-color: var(--coral-dark); background: var(--coral); color: white; }
 .command-bar button[data-command="new"]:hover:not(:disabled), .command-bar button[data-command="quit"]:hover:not(:disabled) { background: var(--coral-dark); }
@@ -231,6 +233,7 @@ button.session-entry:disabled { opacity: .65; cursor: wait; }
     .workspace-footer { display: flex; align-items: stretch; flex-direction: column; }
     .command-bar { display: grid; width: 100%; grid-template-columns: repeat(6, minmax(0, 1fr)); }
     .command-bar button { min-width: 0; padding-inline: 4px; font-size: .7rem; }
+    .command-bar button { width: 100%; flex-basis: auto; }
     .list-command { gap: 4px; }
     .list-command button { flex-basis: auto; min-width: 0; }
     .workflow-log { max-height: 4.8rem; }
