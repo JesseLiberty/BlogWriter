@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "HandoffOrchestration",
+			"path": "../../AgentFrameworkBook/14.Handoff/HandoffOrchestration"
+		}
+	]
+}
