@@ -168,6 +168,8 @@ public sealed class HomePageTests : BunitContext
 
         Assert.True(workspace.State.HasDraft);
         Assert.True(cut.Find("#initial-prompt").HasAttribute("disabled"));
+        Assert.True(cut.Find("#min-words").HasAttribute("disabled"));
+        Assert.True(cut.Find("#max-words").HasAttribute("disabled"));
         Assert.Empty(cut.FindAll("#revision-prompt"));
     }
 

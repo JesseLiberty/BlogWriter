@@ -122,6 +122,7 @@ button, a { touch-action: manipulation; }
     background: var(--surface);
     color: var(--ink);
 }
+.range-field input:disabled { background: #ecece7; color: var(--muted); }
 .range-field input[aria-invalid="true"] { border-color: #9d2c20; }
 .range-separator { align-self: end; padding-bottom: 9px; color: var(--muted); font-size: .72rem; }
 .range-error { color: #9d2c20; font-size: .68rem; line-height: 1.25; overflow-wrap: anywhere; }
