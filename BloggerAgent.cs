@@ -43,10 +43,10 @@ public class BloggerAgent : IBloggerAgent
         : this(new ChatClientAgent(llm.AsBuilder()
             .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
             .Build(), new ChatClientAgentOptions
-        {
-            Name = "Blogger",
-            ChatOptions = chatOptions,
-        }), logger)
+            {
+                Name = "Blogger",
+                ChatOptions = chatOptions,
+            }), logger)
     {
     }
 

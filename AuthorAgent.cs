@@ -34,10 +34,10 @@ public class AuthorAgent : IAuthorAgent
         : this(new ChatClientAgent(llm.AsBuilder()
             .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
             .Build(), new ChatClientAgentOptions
-        {
-            Name = "Author",
-            ChatOptions = chatOptions,
-        }), logger)
+            {
+                Name = "Author",
+                ChatOptions = chatOptions,
+            }), logger)
     {
     }
 

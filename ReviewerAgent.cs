@@ -34,10 +34,10 @@ public class ReviewerAgent : IReviewerAgent
         : this(new ChatClientAgent(llm.AsBuilder()
             .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
             .Build(), new ChatClientAgentOptions
-        {
-            Name = "Reviewer",
-            ChatOptions = chatOptions,
-        }), logger)
+            {
+                Name = "Reviewer",
+                ChatOptions = chatOptions,
+            }), logger)
     {
     }
 
