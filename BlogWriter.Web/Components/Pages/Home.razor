@@ -30,7 +30,7 @@
                          Value="@Workspace.State.InitialPrompt"
                          ValueChanged="value => Workspace.State.InitialPrompt = value"
                          Disabled="@(!Workspace.State.IsInitialPromptEnabled)" />
-            <WordRangeInput Disabled="@(!Workspace.State.IsWordRangeEnabled)"
+            <WordRangeInput Disabled="@(!Workspace.State.IsInitialPromptEnabled)"
                             MinValue="@Workspace.State.MinWordsInput"
                             MinValueChanged="Workspace.UpdateMinWords"
                             MaxValue="@Workspace.State.MaxWordsInput"
