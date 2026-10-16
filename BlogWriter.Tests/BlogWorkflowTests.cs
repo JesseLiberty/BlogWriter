@@ -91,7 +91,9 @@ public sealed class BlogWorkflowTests
             workflow.RunAsync(new ResearchState { MainTask = "topic" }, output: output));
 
         Assert.Contains(output.Updates, update => update.AgentStage == WorkflowAgentStage.Researcher);
-        WorkflowOutputUpdate failure = Assert.Single(output.Updates.Where(update => update.Outcome == WorkflowOutputOutcome.Failure));
+        WorkflowOutputUpdate failure = Assert.Single(
+            output.Updates,
+            update => update.Outcome == WorkflowOutputOutcome.Failure);
         Assert.Equal(WorkflowAgentStage.None, failure.AgentStage);
         Assert.Equal(0, author.Calls);
     }

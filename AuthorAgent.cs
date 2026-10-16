@@ -31,11 +31,13 @@ public class AuthorAgent : IAuthorAgent
 
     // Compatibility overload for callers that supply an in-process test client.
     public AuthorAgent(IChatClient llm, ChatOptions chatOptions, ILogger<AuthorAgent> logger)
-        : this(new ChatClientAgent(llm, new ChatClientAgentOptions
-        {
-            Name = "Author",
-            ChatOptions = chatOptions,
-        }), logger)
+        : this(new ChatClientAgent(llm.AsBuilder()
+            .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
+            .Build(), new ChatClientAgentOptions
+            {
+                Name = "Author",
+                ChatOptions = chatOptions,
+            }), logger)
     {
     }
 
