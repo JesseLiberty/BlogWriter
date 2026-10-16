@@ -1,0 +1,1 @@
+"applicationUrl": "http://localhost:5072"
