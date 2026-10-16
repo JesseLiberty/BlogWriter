@@ -31,7 +31,9 @@ public class ReviewerAgent : IReviewerAgent
     }
 
     public ReviewerAgent(IChatClient llm, ChatOptions chatOptions, ILogger<ReviewerAgent> logger)
-        : this(new ChatClientAgent(llm, new ChatClientAgentOptions
+        : this(new ChatClientAgent(llm.AsBuilder()
+            .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
+            .Build(), new ChatClientAgentOptions
         {
             Name = "Reviewer",
             ChatOptions = chatOptions,

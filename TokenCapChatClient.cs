@@ -45,6 +45,7 @@ public sealed class TokenCapChatClient : DelegatingChatClient
         return innerClient => new TokenCapChatClient(
             innerClient.AsBuilder()
                 .ConfigureOptions(options => options.MaxOutputTokens ??= maxOutputTokens)
+                .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
                 .Build(),
             budget);
     }

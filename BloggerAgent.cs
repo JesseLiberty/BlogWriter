@@ -40,7 +40,9 @@ public class BloggerAgent : IBloggerAgent
 
     // Compatibility overload for callers that supply an in-process test client.
     public BloggerAgent(IChatClient llm, ChatOptions chatOptions, ILogger<BloggerAgent> logger)
-        : this(new ChatClientAgent(llm, new ChatClientAgentOptions
+        : this(new ChatClientAgent(llm.AsBuilder()
+            .UseOpenTelemetry(sourceName: "BlogWriter.ChatClient")
+            .Build(), new ChatClientAgentOptions
         {
             Name = "Blogger",
             ChatOptions = chatOptions,
