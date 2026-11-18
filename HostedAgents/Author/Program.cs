@@ -12,7 +12,7 @@ using Microsoft.Agents.AI.Foundry.Hosting;
 var projectEndpoint = new Uri(
     Environment.GetEnvironmentVariable("FOUNDRY_PROJECT_ENDPOINT")
         ?? throw new InvalidOperationException("FOUNDRY_PROJECT_ENDPOINT is not set."));
-string modelDeployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME") ?? "gpt-5-mini";
+string modelDeployment = Environment.GetEnvironmentVariable("AZURE_AI_MODEL_DEPLOYMENT_NAME") ?? "gpt-5.6-terra";
 
 // Entra ID only — no API keys, per repository constraint.
 AIAgent agent = new AIProjectClient(projectEndpoint, new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned))
